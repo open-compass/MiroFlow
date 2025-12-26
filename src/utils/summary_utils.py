@@ -42,6 +42,7 @@ async def extract_hints(
     chinese_context: bool,
     add_message_id: bool,
     base_url: str = "https://api.openai.com/v1",
+    model_name: str = "o3",
 ) -> str:
     """Use LLM to extract task hints"""
     client = AsyncOpenAI(api_key=api_key, timeout=600, base_url=base_url)
@@ -91,7 +92,7 @@ Here is the question:
         content = f"[{message_id}] {content}"
 
     response = await client.chat.completions.create(
-        model="o3",
+        model=model_name,
         messages=[{"role": "user", "content": content}],
         reasoning_effort="high",
     )
@@ -111,7 +112,7 @@ Here is the question:
     before_sleep=_log_retry("get_gaia_answer_type"),
 )
 async def get_gaia_answer_type(
-    task_description: str, api_key: str, base_url: str = "https://api.openai.com/v1"
+    task_description: str, api_key: str, base_url: str = "https://api.openai.com/v1", model_name: str = "o3"
 ) -> str:
     client = AsyncOpenAI(api_key=api_key, timeout=600, base_url=base_url)
 
@@ -132,7 +133,7 @@ Return exactly one of the [number, date, time, string], nothing else.
 
     message_id = _generate_message_id()
     response = await client.chat.completions.create(
-        model="o3",
+        model=model_name,
         messages=[{"role": "user", "content": f"[{message_id}] {instruction}"}],
     )
     answer_type = response.choices[0].message.content
@@ -156,9 +157,10 @@ async def extract_gaia_final_answer(
     api_key: str,
     chinese_context: bool,
     base_url: str = "https://api.openai.com/v1",
+    model_name: str = "o3",
 ) -> str:
     """Use LLM to extract final answer from summary"""
-    answer_type = await get_gaia_answer_type(task_description_detail, api_key, base_url)
+    answer_type = await get_gaia_answer_type(task_description_detail, api_key, base_url, model_name)
 
     client = AsyncOpenAI(api_key=api_key, timeout=600, base_url=base_url)
 
@@ -473,7 +475,7 @@ The boxed content must be **one** of:
 
     message_id = _generate_message_id()
     response = await client.chat.completions.create(
-        model="o3",
+        model=model_name,
         messages=[{"role": "user", "content": f"[{message_id}] {full_prompt}"}],
     )
     result = response.choices[0].message.content
@@ -504,6 +506,7 @@ async def extract_browsecomp_zh_final_answer(
     summary: str,
     api_key: str,
     base_url: str = "https://api.openai.com/v1",
+    model_name: str = "o3",
 ) -> str:
     """Use LLM to extract final answer from summary"""
     client = AsyncOpenAI(api_key=api_key, timeout=600, base_url=base_url)
@@ -619,7 +622,7 @@ async def extract_browsecomp_zh_final_answer(
 
     message_id = _generate_message_id()
     response = await client.chat.completions.create(
-        model="o3",
+        model=model_name,
         messages=[{"role": "user", "content": f"[{message_id}] {full_prompt}"}],
         reasoning_effort="medium",
     )

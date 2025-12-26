@@ -150,26 +150,42 @@ def _validate_and_set_env_params(service_env_params: dict) -> Optional[str]:
     if not service_env_params:
         service_env_params = {}
 
-    # Required tool APIs
+    # Required parameters
     required_params = [
+        # tool-reasoning triplet
         "OPENROUTER_API_KEY",
         "OPENROUTER_BASE_URL",
+        # search tools
         "SERPER_API_KEY",
         "JINA_API_KEY",
+        # code execution
         "E2B_API_KEY",
-        "OPENAI_API_KEY",
-        "OPENAI_BASE_URL",
-        "HINT_LLM_BASE_URL",
-        "FINAL_ANSWER_LLM_BASE_URL",
     ]
 
-    # Optional parameters with default values
+    # Required parameters with default values
+    required_params_with_defaults = {
+        "OPENROUTER_MODEL_NAME": "gpt-5",
+    }
+
+    # Optional parameters with default values (use "$ENV_VAR" to reference other env vars)
     optional_params = {
-        "ANTHROPIC_API_KEY": "dummy-key",
-        "GEMINI_API_KEY": "dummy-key",
-        "VISION_API_KEY": "dummy-key",
-        "WHISPER_API_KEY": "dummy-key",
-        "DATA_DIR": "data/",
+        # tool-image-video triplet (defaults to OPENROUTER_* values)
+        "VISION_API_KEY": "$OPENROUTER_API_KEY",
+        "VISION_BASE_URL": "$OPENROUTER_BASE_URL",
+        "VISION_MODEL_NAME": "gpt-4o",
+        # tool-audio triplet (defaults to OPENROUTER_* values)
+        "AUDIO_API_KEY": "$OPENROUTER_API_KEY",
+        "AUDIO_BASE_URL": "$OPENROUTER_BASE_URL",
+        "AUDIO_TRANSCRIPTION_MODEL_NAME": "gpt-4o-mini-transcribe",
+        "AUDIO_MODEL_NAME": "gpt-4o-audio-preview",
+        # hint generation triplet (defaults to OPENROUTER_* values)
+        "HINT_LLM_API_KEY": "$OPENROUTER_API_KEY",
+        "HINT_LLM_BASE_URL": "$OPENROUTER_BASE_URL",
+        "HINT_LLM_MODEL_NAME": "$OPENROUTER_MODEL_NAME",
+        # final answer extraction triplet (defaults to OPENROUTER_* values)
+        "FINAL_ANSWER_LLM_API_KEY": "$OPENROUTER_API_KEY",
+        "FINAL_ANSWER_LLM_BASE_URL": "$OPENROUTER_BASE_URL",
+        "FINAL_ANSWER_LLM_MODEL_NAME": "$OPENROUTER_MODEL_NAME",
     }
 
     # Validate and set required parameters
@@ -184,19 +200,26 @@ def _validate_and_set_env_params(service_env_params: dict) -> Optional[str]:
     if missing_params:
         return f"Missing required service_env_params: {', '.join(missing_params)}"
 
-    # Set optional parameters with smart defaults
-    for param, default_value in optional_params.items():
+    # Set required parameters with defaults (use provided value or default)
+    for param, default_value in required_params_with_defaults.items():
         value = service_env_params.get(param)
-        if value:
+        if value and str(value).strip():
             os.environ[param] = str(value).strip()
-        elif default_value is None:
-            # Use referenced env var as fallback
-            if param == "FINAL_ANSWER_LLM_BASE_URL":
-                os.environ[param] = os.environ.get("HINT_LLM_BASE_URL", "https://api.openai.com/v1")
-            elif param == "REASONING_API_KEY":
-                os.environ[param] = os.environ.get("OPENAI_API_KEY", "dummy-key")
         else:
             os.environ[param] = default_value
+
+    # Set optional parameters (use provided value or default)
+    for param, default_value in optional_params.items():
+        value = service_env_params.get(param)
+        if value and str(value).strip():
+            os.environ[param] = str(value).strip()
+        elif default_value is not None:
+            # Handle $ENV_VAR references
+            if isinstance(default_value, str) and default_value.startswith("$"):
+                ref_var = default_value[1:]
+                os.environ[param] = os.environ.get(ref_var, "")
+            else:
+                os.environ[param] = default_value
 
     logger.info("Tool API environment variables configured successfully")
     return None
