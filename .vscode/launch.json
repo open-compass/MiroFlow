@@ -1,0 +1,78 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "MiroFlow Service: Debug",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "miroflow_service_fastapi:app",
+                "--host", "0.0.0.0",
+                "--port", "8082",
+                "--reload"
+            ],
+            "jinja": true,
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "LOGGER_LEVEL": "DEBUG",
+                "DATA_DIR": "data/"
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "MiroFlow Service: Debug (Single Worker)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/miroflow_service_fastapi.py",
+            "args": [
+                "--host", "0.0.0.0",
+                "--port", "8082",
+                "--workers", "1"
+            ],
+            "jinja": true,
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "LOGGER_LEVEL": "DEBUG",
+                "DATA_DIR": "data/"
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "MiroFlow Service: Debug with Custom Port",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "miroflow_service_fastapi:app",
+                "--host", "127.0.0.1",
+                "--port", "8003",
+                "--reload"
+            ],
+            "jinja": true,
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "LOGGER_LEVEL": "DEBUG",
+                "DATA_DIR": "data/",
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "LOGGER_LEVEL": "DEBUG",
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        }
+    ]
+}

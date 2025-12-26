@@ -2,10 +2,16 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 import re
 from openai import AsyncOpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 import uuid
+
+from src.logging.logger import bootstrap_logger
+
+LOGGER_LEVEL = os.getenv("LOGGER_LEVEL", "INFO")
+logger = bootstrap_logger(level=LOGGER_LEVEL)
 
 
 def _generate_message_id() -> str:
@@ -14,12 +20,21 @@ def _generate_message_id() -> str:
     return f"msg_{uuid.uuid4().hex[:8]}"
 
 
+def _log_retry(func_name: str):
+    """Create a before_sleep callback that logs the attempt number and error reason."""
+    def callback(retry_state):
+        exception = retry_state.outcome.exception() if retry_state.outcome else None
+        error_msg = str(exception) if exception else "Unknown error"
+        logger.warning(
+            f"Retry attempt {retry_state.attempt_number} for {func_name}: {error_msg}"
+        )
+    return callback
+
+
 @retry(
     wait=wait_exponential(multiplier=15),
     stop=stop_after_attempt(5),
-    retry_error_callback=lambda retry_state: print(
-        f"Retry attempt {retry_state.attempt_number} for extract_hints"
-    ),
+    before_sleep=_log_retry("extract_hints"),
 )
 async def extract_hints(
     question: str,
@@ -93,9 +108,7 @@ Here is the question:
 @retry(
     wait=wait_exponential(multiplier=15),
     stop=stop_after_attempt(5),
-    retry_error_callback=lambda retry_state: print(
-        f"Retry attempt {retry_state.attempt_number} for get_gaia_answer_type"
-    ),
+    before_sleep=_log_retry("get_gaia_answer_type"),
 )
 async def get_gaia_answer_type(
     task_description: str, api_key: str, base_url: str = "https://api.openai.com/v1"
@@ -115,11 +128,11 @@ Determine the expected data type of the answer. For questions asking to "identif
 Output:
 Return exactly one of the [number, date, time, string], nothing else.
 """
-    print(f"Answer type instruction: {instruction}")
+    logger.debug(f"Answer type instruction: {instruction}")
 
     message_id = _generate_message_id()
     response = await client.chat.completions.create(
-        model="gpt-4.1",
+        model="o3",
         messages=[{"role": "user", "content": f"[{message_id}] {instruction}"}],
     )
     answer_type = response.choices[0].message.content
@@ -127,7 +140,7 @@ Return exactly one of the [number, date, time, string], nothing else.
     if not answer_type or not answer_type.strip():
         raise ValueError("answer type returned empty result")
 
-    print(f"Answer type: {answer_type}")
+    logger.debug(f"Answer type: {answer_type}")
 
     return answer_type.strip()
 
@@ -135,9 +148,7 @@ Return exactly one of the [number, date, time, string], nothing else.
 @retry(
     wait=wait_exponential(multiplier=15),
     stop=stop_after_attempt(5),
-    retry_error_callback=lambda retry_state: print(
-        f"Retry attempt {retry_state.attempt_number} for extract_gaia_final_answer"
-    ),
+    before_sleep=_log_retry("extract_gaia_final_answer"),
 )
 async def extract_gaia_final_answer(
     task_description_detail: str,
@@ -457,8 +468,8 @@ The boxed content must be **one** of:
         answer_type if answer_type in ["number", "time"] else "string"
     )
 
-    print("Extract Final Answer Prompt:")
-    print(full_prompt)
+    logger.debug("Extract Final Answer Prompt:")
+    logger.debug(full_prompt)
 
     message_id = _generate_message_id()
     response = await client.chat.completions.create(
@@ -476,7 +487,7 @@ The boxed content must be **one** of:
     if not boxed_match:
         raise ValueError("Final answer extraction returned empty answer")
 
-    print("response:", result)
+    logger.debug(f"response: {result}")
 
     # Return the full response directly for downstream LLM processing
     # This contains all structured information: analysis, boxed answer, confidence, evidence, and weaknesses
@@ -486,9 +497,7 @@ The boxed content must be **one** of:
 @retry(
     wait=wait_exponential(multiplier=15),
     stop=stop_after_attempt(5),
-    retry_error_callback=lambda retry_state: print(
-        f"Retry attempt {retry_state.attempt_number} for extract_browsecomp_zh_final_answer"
-    ),
+    before_sleep=_log_retry("extract_browsecomp_zh_final_answer"),
 )
 async def extract_browsecomp_zh_final_answer(
     task_description_detail: str,
@@ -605,8 +614,8 @@ async def extract_browsecomp_zh_final_answer(
         + common_confidence_section
     )
 
-    print("Extract Final Answer Prompt:")
-    print(full_prompt)
+    logger.debug("Extract Final Answer Prompt:")
+    logger.debug(full_prompt)
 
     message_id = _generate_message_id()
     response = await client.chat.completions.create(
@@ -625,7 +634,7 @@ async def extract_browsecomp_zh_final_answer(
     if not boxed_match:
         raise ValueError("Final answer extraction returned empty answer")
 
-    print("response:", result)
+    logger.debug(f"response: {result}")
 
     # Return the full response directly for downstream LLM processing
     # This contains all structured information: analysis, boxed answer, confidence, evidence, and weaknesses

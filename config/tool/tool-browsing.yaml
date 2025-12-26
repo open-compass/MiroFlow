@@ -11,3 +11,6 @@ env:
   OPENAI_API_KEY: "${oc.env:OPENAI_API_KEY}"
   OPENAI_BASE_URL: "${oc.env:OPENAI_BASE_URL,https://api.openai.com/v1}"
   OPENAI_MODEL_NAME: "${oc.env:OPENAI_MODEL_NAME,gpt-4o}"
+  http_proxy: "${oc.env:http_proxy,}"
+  https_proxy: "${oc.env:https_proxy,}"
+  no_proxy: "${oc.env:no_proxy,}"

@@ -10,3 +10,6 @@ env:
   REMOVE_SNIPPETS: "${oc.env:REMOVE_SNIPPETS,false}"
   REMOVE_KNOWLEDGE_GRAPH: "${oc.env:REMOVE_KNOWLEDGE_GRAPH,false}"
   REMOVE_ANSWER_BOX: "${oc.env:REMOVE_ANSWER_BOX,false}"
+  http_proxy: "${oc.env:http_proxy,}"
+  https_proxy: "${oc.env:https_proxy,}"
+  no_proxy: "${oc.env:no_proxy,}"

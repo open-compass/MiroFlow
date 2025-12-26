@@ -22,7 +22,12 @@ SERPER_BASE_URL = os.environ.get("SERPER_BASE_URL", "https://google.serper.dev")
 JINA_API_KEY = os.environ.get("JINA_API_KEY", "")
 JINA_BASE_URL = os.environ.get("JINA_BASE_URL", "https://r.jina.ai")
 
-IS_MIRO_API = True if "miro" in SERPER_BASE_URL or "miro" in JINA_BASE_URL else False
+# Proxy settings
+HTTP_PROXY = os.environ.get("http_proxy", "")
+HTTPS_PROXY = os.environ.get("https_proxy", "")
+NO_PROXY = os.environ.get("no_proxy", "")
+
+IS_MIRO_API = True
 
 # Google search result filtering environment variables
 REMOVE_SNIPPETS = os.environ.get("REMOVE_SNIPPETS", "").lower() in ("true", "1", "yes")
@@ -128,46 +133,85 @@ async def google_search(
     if tbs:
         arguments["tbs"] = tbs
     if IS_MIRO_API:
+        # Build env dict with API keys and proxy settings
+        subprocess_env = {
+            "SERPER_API_KEY": SERPER_API_KEY,
+            "SERPER_BASE_URL": SERPER_BASE_URL,
+        }
+        # Add proxy settings if available
+        if HTTP_PROXY:
+            subprocess_env["http_proxy"] = HTTP_PROXY
+            subprocess_env["HTTP_PROXY"] = HTTP_PROXY
+        if HTTPS_PROXY:
+            subprocess_env["https_proxy"] = HTTPS_PROXY
+            subprocess_env["HTTPS_PROXY"] = HTTPS_PROXY
+        if NO_PROXY:
+            subprocess_env["no_proxy"] = NO_PROXY
+            subprocess_env["NO_PROXY"] = NO_PROXY
+        
         server_params = StdioServerParameters(
             command=sys.executable,
             args=["-m", "src.tool.mcp_servers.miroapi_serper_mcp_server"],
-            env={"SERPER_API_KEY": SERPER_API_KEY, "SERPER_BASE_URL": SERPER_BASE_URL},
+            env=subprocess_env,
         )
-    else:
-        server_params = StdioServerParameters(
-            command="npx",
-            args=["-y", "serper-search-scrape-mcp-server"],
-            env={"SERPER_API_KEY": SERPER_API_KEY},
-        )
-    result_content = ""
-    retry_count = 0
-    max_retries = 5
+        
+        result_content = ""
+        retry_count = 0
+        max_retries = 5
 
-    while retry_count < max_retries:
-        try:
-            async with stdio_client(server_params) as (read, write):
-                async with ClientSession(
-                    read, write, sampling_callback=None
-                ) as session:
-                    await session.initialize()
-                    tool_result = await session.call_tool(
-                        tool_name, arguments=arguments
-                    )
-                    result_content = (
-                        tool_result.content[-1].text if tool_result.content else ""
-                    )
-                    assert (
-                        result_content is not None and result_content.strip() != ""
-                    ), "Empty result from google_search tool, please try again."
-                    # Apply filtering based on environment variables
-                    filtered_result = filter_google_search_result(result_content)
-                    return filtered_result  # Success, exit retry loop
-        except Exception as error:
-            retry_count += 1
-            if retry_count >= max_retries:
-                return f"[ERROR]: google_search tool execution failed after {max_retries} attempts: {str(error)}"
-            # Wait before retrying
-            await asyncio.sleep(min(2**retry_count, 60))
+        while retry_count < max_retries:
+            try:
+                async with stdio_client(server_params) as (read, write):
+                    async with ClientSession(
+                        read, write, sampling_callback=None
+                    ) as session:
+                        await session.initialize()
+                        tool_result = await session.call_tool(
+                            tool_name, arguments=arguments
+                        )
+                        result_content = (
+                            tool_result.content[-1].text if tool_result.content else ""
+                        )
+                        assert (
+                            result_content is not None and result_content.strip() != ""
+                        ), "Empty result from google_search tool, please try again."
+                        # Apply filtering based on environment variables
+                        filtered_result = filter_google_search_result(result_content)
+                        return filtered_result  # Success, exit retry loop
+            except Exception as error:
+                retry_count += 1
+                if retry_count >= max_retries:
+                    return f"[ERROR]: google_search tool execution failed after {max_retries} attempts: {str(error)}"
+                # Wait before retrying
+                await asyncio.sleep(min(2**retry_count, 60))
+    else:
+        # Use Python requests instead of npx
+        headers = {
+            'X-API-KEY': SERPER_API_KEY,
+            'Content-Type': 'application/json'
+        }
+        
+        retry_count = 0
+        max_retries = 5
+        
+        while retry_count < max_retries:
+            try:
+                loop = asyncio.get_running_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: requests.post("https://google.serper.dev/search", headers=headers, data=json.dumps(arguments))
+                )
+                response.raise_for_status()
+                result_content = json.dumps(response.json())
+                
+                # Apply filtering based on environment variables
+                filtered_result = filter_google_search_result(result_content)
+                return filtered_result
+            except Exception as error:
+                retry_count += 1
+                if retry_count >= max_retries:
+                    return f"[ERROR]: google_search tool execution failed after {max_retries} attempts: {str(error)}"
+                await asyncio.sleep(min(2**retry_count, 60))
 
     return "[ERROR]: Unknown error occurred in google_search tool, please try again."
 

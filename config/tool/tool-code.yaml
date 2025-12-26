@@ -9,3 +9,6 @@ env:
   LOGS_DIR: "./logs"
   DEFAULT_TEMPLATE_ID: "all_pip_apt_pkg"
   DEFAULT_TIMEOUT: "1800"
+  http_proxy: "${oc.env:http_proxy,}"
+  https_proxy: "${oc.env:https_proxy,}"
+  no_proxy: "${oc.env:no_proxy,}"

@@ -12,6 +12,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypedDict
 import random
+from tqdm.asyncio import tqdm
 
 import dotenv
 import hydra
@@ -163,7 +164,7 @@ class BenchmarkEvaluator(ABC):
         Returns:
             BenchmarkResult object
         """
-        print(f"Processing task {task.task_id} with pass@{self.pass_at_k}")
+        print(f"Processing task {task.task_id} with pass@{self.pass_at_k}", flush=True)
 
         result = BenchmarkResult(
             task_id=task.task_id,
@@ -185,8 +186,8 @@ class BenchmarkEvaluator(ABC):
         found_correct_answer = False
 
         # Print debug info about log directory
-        print(f"  Current result directory: {self.output_dir}")
-        print(f"  Current task log directory: {self.output_dir}/task_logs")
+        print(f"  Current result directory: {self.output_dir}", flush=True)
+        print(f"  Current task log directory: {self.output_dir}/task_logs", flush=True)
 
         try:
             # Prepare task
@@ -194,7 +195,7 @@ class BenchmarkEvaluator(ABC):
 
             # Run up to k attempts (with early stopping when correct answer found)
             for attempt in range(1, self.pass_at_k + 1):
-                print(f"  Attempt {attempt}/{self.pass_at_k} for task {task.task_id}")
+                print(f"  Attempt {attempt}/{self.pass_at_k} for task {task.task_id}", flush=True)
 
                 attempt_result = self.scan_latest_attempt(task, attempt)
                 # Run inference if no existing result
@@ -234,7 +235,7 @@ class BenchmarkEvaluator(ABC):
                     except Exception as e:
                         attempt_result["status"] = TaskStatus.RUN_FAILED
                         attempt_result["error_message"] = str(e)
-                        print(f"    Error in attempt {attempt}: {e}")
+                        print(f"    Error in attempt {attempt}: {e}", flush=True)
 
                 # Perform LLM verification if we have an answer and haven't verified yet
                 if (
@@ -242,7 +243,7 @@ class BenchmarkEvaluator(ABC):
                     or attempt_result["judge_result"] == "NOT_ATTEMPTED"
                 ):
                     # if attempt_result["status"] == TaskStatus.RUN_COMPLETED:
-                    print(f"    Verifying answer for attempt {attempt}...")
+                    print(f"    Verifying answer for attempt {attempt}...", flush=True)
                     try:
                         evaluation_result = await verify_answer_for_datasets(
                             openai_client=self.evaluation_llm,
@@ -264,27 +265,39 @@ class BenchmarkEvaluator(ABC):
                             )
 
                         if attempt_result["is_correct"]:
-                            print(f"    ✅ Attempt {attempt}: CORRECT!")
+                            print(f"    ✅ Attempt {attempt}: CORRECT!", flush=True)
                             found_correct_answer = True
                         else:
                             print(
-                                f"    ❌ Attempt {attempt}: INCORRECT ({evaluation_result})"
+                                f"    ❌ Attempt {attempt}: INCORRECT ({evaluation_result})",
+                                flush=True
                             )
 
                     except Exception as e:
-                        print(f"    Error verifying attempt {attempt}: {e}")
+                        print(f"    Error verifying attempt {attempt}: {e}", flush=True)
                         attempt_result["judge_result"] = "ERROR"
                         attempt_result["is_correct"] = False
 
                 if attempt_result["is_correct"]:
-                    print(f"    ✅ Attempt {attempt}: CORRECT (cached)")
+                    print(f"    ✅ Attempt {attempt}: CORRECT (cached)", flush=True)
                     found_correct_answer = True
                 elif attempt_result["judge_result"]:
                     print(
-                        f"    ❌ Attempt {attempt}: INCORRECT (cached: {attempt_result['judge_result']})"
+                        f"    ❌ Attempt {attempt}: INCORRECT (cached: {attempt_result['judge_result']})",
+                        flush=True
                     )
                 else:
-                    print(f"    ⚠️  Attempt {attempt}: No valid answer to verify")
+                    print(f"    ⚠️  Attempt {attempt}: No valid answer to verify", flush=True)
+
+                # Log detailed result for each attempt (flush=True to ensure immediate output to log file)
+                print(f"\n{'='*60}", flush=True)
+                print(f"[TASK RESULT] Task ID: {task.task_id}", flush=True)
+                print(f"[TASK RESULT] Attempt: {attempt}/{self.pass_at_k}", flush=True)
+                print(f"[TASK RESULT] Predicted Answer: {attempt_result['model_boxed_answer']}", flush=True)
+                print(f"[TASK RESULT] Ground Truth: {task.ground_truth}", flush=True)
+                print(f"[TASK RESULT] Judge Result: {attempt_result['judge_result']}", flush=True)
+                print(f"[TASK RESULT] Is Correct: {'✅ YES' if attempt_result['is_correct'] else '❌ NO'}", flush=True)
+                print(f"{'='*60}\n", flush=True)
 
                 result.attempts.append(attempt_result)
 
@@ -303,14 +316,15 @@ class BenchmarkEvaluator(ABC):
                 # Early stopping: if we found a correct answer, we can stop
                 if found_correct_answer:
                     print(
-                        f"    🎯 Found correct answer! Stopping early after {attempt} attempts."
+                        f"    🎯 Found correct answer! Stopping early after {attempt} attempts.",
+                        flush=True
                     )
                     break
 
         except Exception as e:
             result.error_message = str(e)
             result.status = "failed"
-            print(f"Error processing task {task.task_id}: {e}")
+            print(f"Error processing task {task.task_id}: {e}", flush=True)
 
         finally:
             result.pass_at_k_success = found_correct_answer
@@ -321,10 +335,20 @@ class BenchmarkEvaluator(ABC):
             else:
                 result.judge_result = "PASS_AT_K_FAILED"
 
-            print(f"Task {task.task_id} completed with {len(result.attempts)} attempts")
+            print(f"Task {task.task_id} completed with {len(result.attempts)} attempts", flush=True)
             print(
-                f"    Pass@{self.pass_at_k} result: {'✅ SUCCESS' if found_correct_answer else '❌ FAILED'}"
+                f"    Pass@{self.pass_at_k} result: {'✅ SUCCESS' if found_correct_answer else '❌ FAILED'}",
+                flush=True
             )
+            
+            # Log final task summary (flush=True to ensure immediate output to log file)
+            print(f"\n{'#'*60}", flush=True)
+            print(f"[TASK SUMMARY] Task ID: {task.task_id}", flush=True)
+            print(f"[TASK SUMMARY] Total Attempts: {len(result.attempts)}", flush=True)
+            print(f"[TASK SUMMARY] Final Status: {'✅ PASSED' if found_correct_answer else '❌ FAILED'}", flush=True)
+            print(f"[TASK SUMMARY] Best Answer: {result.model_boxed_answer}", flush=True)
+            print(f"[TASK SUMMARY] Ground Truth: {task.ground_truth}", flush=True)
+            print(f"{'#'*60}\n", flush=True)
 
         return result
 
@@ -376,10 +400,12 @@ class BenchmarkEvaluator(ABC):
 
         semaphore = asyncio.Semaphore(max_concurrent)
 
-        async def run_with_semaphore(task):
+        async def run_with_semaphore(task, pbar=None):
             async with semaphore:
                 with task_logging_context(task.task_id, self.get_log_dir()):
                     result = await self.run_single_task(task)
+                    if pbar:
+                        pbar.update(1)
                 return result
 
         # Shuffle tasks to avoid order bias and improve balancing
@@ -387,10 +413,14 @@ class BenchmarkEvaluator(ABC):
         random.shuffle(shuffled_tasks)
 
         # Run tasks in parallel
+        # Use tqdm to show progress bar
+        pbar = tqdm(total=len(shuffled_tasks), desc="Processing Tasks", unit="task")
+        
         results = await asyncio.gather(
-            *[run_with_semaphore(task) for task in shuffled_tasks],
+            *[run_with_semaphore(task, pbar) for task in shuffled_tasks],
             return_exceptions=True,
         )
+        pbar.close()
 
         # Handle exceptions
         processed_results = []
@@ -706,16 +736,35 @@ def main(*args, config_file_name: str = ""):
     LOGGER_LEVEL = os.getenv("LOGGER_LEVEL", "INFO")
 
     # Support load from config_file_name
+    # Filter config_file_name out of args if present
+    filtered_args = []
+    
     if config_file_name:
         chosen_config_name = config_file_name
     else:
-        chosen_config_name = config_name()
+        # Check if config_file_name is passed as key=value in args
+        temp_config_name = None
+        for arg in args:
+            if arg.startswith("config_file_name="):
+                temp_config_name = arg.split("=", 1)[1]
+            else:
+                filtered_args.append(arg)
+        
+        if temp_config_name:
+            chosen_config_name = temp_config_name
+        else:
+            chosen_config_name = config_name()
+            # If no config name found in args, keep args as is (filtered_args = args is not quite right if we didn't filter anything)
+            filtered_args = list(args)
+
+    # Ensure config path is absolute
+    abs_config_path = os.path.abspath(config_path())
 
     with hydra.initialize_config_dir(
-        config_dir=os.path.abspath(config_path()), version_base=None
+        config_dir=abs_config_path, version_base=None
     ):
-        cfg = hydra.compose(config_name=chosen_config_name, overrides=list(args))
-        cfg = setup_hydra_output_dir(cfg, list(args))
+        cfg = hydra.compose(config_name=chosen_config_name, overrides=filtered_args)
+        cfg = setup_hydra_output_dir(cfg, filtered_args)
 
         _ = bootstrap_logger(level=LOGGER_LEVEL)
         # Tracing functionality removed - miroflow-contrib deleted

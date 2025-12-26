@@ -12,4 +12,7 @@ env:
   ANTHROPIC_API_KEY: "${oc.env:ANTHROPIC_API_KEY}"
   ANTHROPIC_BASE_URL: "${oc.env:ANTHROPIC_BASE_URL,https://api.anthropic.com}"
   ANTHROPIC_MODEL_NAME: "${oc.env:ANTHROPIC_MODEL_NAME,claude-3-7-sonnet-20250219}"
+  http_proxy: "${oc.env:http_proxy,}"
+  https_proxy: "${oc.env:https_proxy,}"
+  no_proxy: "${oc.env:no_proxy,}"
   

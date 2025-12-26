@@ -81,7 +81,8 @@ async def visual_question_answering(image_path_or_url: str, question: str) -> st
                     f"data:{mime_type};base64,{image_data}"
                 )
         elif image_path_or_url.startswith(("http://", "https://")):
-            async with aiohttp.ClientSession() as session:
+            # trust_env=True enables reading proxy settings from environment variables
+            async with aiohttp.ClientSession(trust_env=True) as session:
                 async with session.get(image_path_or_url) as resp:
                     if resp.status == 200:
                         image_bytes = await resp.read()

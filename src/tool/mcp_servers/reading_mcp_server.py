@@ -59,7 +59,8 @@ async def read_file(uri: str) -> str:
         retry_count = 0
         while retry_count <= 3:
             try:
-                async with aiohttp.ClientSession(headers=headers) as session:
+                # trust_env=True enables reading proxy settings from environment variables
+                async with aiohttp.ClientSession(headers=headers, trust_env=True) as session:
                     async with session.get(uri) as resp:
                         resp.raise_for_status()
                         data = await resp.read()

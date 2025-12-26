@@ -20,6 +20,42 @@ LOGGER_LEVEL = os.getenv("LOGGER_LEVEL", "INFO")
 logger = bootstrap_logger(level=LOGGER_LEVEL)
 
 
+def _extract_trajectory_from_task_log(task_log: TaskTracer) -> dict:
+    """
+    Extract full trajectory from TaskTracer for AgentCompass compatibility.
+
+    Returns the complete MiroFlow execution data structure containing:
+    - main_agent_message_history: Full message history of the main agent
+    - sub_agent_message_history_sessions: Message histories of all sub-agent sessions
+    - step_logs: Detailed step-by-step execution logs
+
+    Args:
+        task_log: TaskTracer instance containing execution logs
+
+    Returns:
+        Dictionary containing the full trajectory structure
+    """
+    # Convert step_logs to serializable format
+    step_logs_serializable = []
+    for step in task_log.step_logs:
+        step_logs_serializable.append({
+            "step_name": step.step_name,
+            "message": step.message,
+            "timestamp": step.timestamp.isoformat() if hasattr(step.timestamp, 'isoformat') else str(step.timestamp),
+            "status": step.status,
+            "metadata": step.metadata if hasattr(step, 'metadata') else {}
+        })
+
+    # Return full trajectory structure
+    trajectory = {
+        "main_agent_message_history": task_log.main_agent_message_history or {},
+        "sub_agent_message_history_sessions": task_log.sub_agent_message_history_sessions or {},
+        "step_logs": step_logs_serializable
+    }
+
+    return trajectory
+
+
 async def execute_task_pipeline(
     cfg: DictConfig,
     task_name: str,
@@ -32,7 +68,7 @@ async def execute_task_pipeline(
     log_path: pathlib.Path,
     ground_truth: str | None = None,
     metadata: dict | None = None,
-) -> tuple[str, str, pathlib.Path]:
+) -> tuple[str, str, pathlib.Path, dict, dict]:
     """
     Executes the full pipeline for a single task.
 
@@ -52,6 +88,8 @@ async def execute_task_pipeline(
         - A string with the final execution log and summary, or an error message.
         - The final boxed answer.
         - The path to the log file.
+        - The trajectory (dict with main_agent_message_history, sub_agent_message_history_sessions, step_logs).
+        - The usage statistics (dict with token counts and tool calls).
     """
     logger.debug(f"Starting Task Execution: {task_id}")
 
@@ -137,13 +175,24 @@ async def execute_task_pipeline(
         task_log.error = error_details
 
     finally:
+        # Collect usage statistics from main agent LLM client only (the tested model)
+        usage_stats = {}
         if main_agent_llm_client is not None:
+            usage_stats = {
+                "input_tokens": main_agent_llm_client.total_input_tokens,
+                "input_cached_tokens": main_agent_llm_client.total_input_cached_tokens,
+                "output_tokens": main_agent_llm_client.total_output_tokens,
+                "output_reasoning_tokens": main_agent_llm_client.total_output_reasoning_tokens,
+                "total_tokens": main_agent_llm_client.total_input_tokens + main_agent_llm_client.total_output_tokens,
+            }
             main_agent_llm_client.close()
+
         if (
             sub_agent_llm_client != main_agent_llm_client
             and sub_agent_llm_client is not None
         ):
             sub_agent_llm_client.close()
+
         task_log.end_time = datetime.now()
 
         # Record task summary to structured log
@@ -157,7 +206,10 @@ async def execute_task_pipeline(
         task_log.save()
         logger.debug(f"--- Finished Task Execution: {task_id} ---")
 
-        return final_answer, final_boxed_answer, task_log.log_path
+        # Extract trajectory from task log
+        trajectory = _extract_trajectory_from_task_log(task_log)
+
+        return final_answer, final_boxed_answer, task_log.log_path, trajectory, usage_stats
 
 
 def create_pipeline_components(cfg: DictConfig, logs_dir: str | None = None):

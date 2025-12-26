@@ -38,7 +38,7 @@ async def smart_request(url: str, params: dict = None, env: dict = None) -> str:
     if JINA_API_KEY == "" and SERPER_API_KEY == "":
         return "[ERROR]: JINA_API_KEY and SERPER_API_KEY are not set, smart_request is not available."
 
-    IS_MIRO_API = True if "miro" in JINA_BASE_URL else False
+    IS_MIRO_API = True
 
     # Auto-add https:// if no protocol is specified
     protocol_hint = ""
@@ -164,21 +164,22 @@ async def scrape_serper(url: str, serper_api_key: str) -> tuple[str, str]:
             "SERPER_API_KEY is not set, SERPER scraping is not available.",
         )
 
-    server_params = StdioServerParameters(
-        command="npx",
-        args=["-y", "serper-search-scrape-mcp-server"],
-        env={"SERPER_API_KEY": serper_api_key},
-    )
-    tool_name = "scrape"
-    arguments = {"url": url}
+    headers = {
+        "X-API-KEY": serper_api_key,
+        "Content-Type": "application/json"
+    }
+    payload = json.dumps({"url": url})
+    
     try:
-        async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write, sampling_callback=None) as session:
-                await session.initialize()
-                tool_result = await session.call_tool(tool_name, arguments=arguments)
-                result_content = (
-                    tool_result.content[-1].text if tool_result.content else ""
-                )
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, 
+            lambda: requests.post("https://scrape.serper.dev", headers=headers, data=payload)
+        )
+        
+        response.raise_for_status()
+        result = response.json()
+        result_content = result.get("text", "")
         return result_content, None
     except Exception as e:
         return None, f"Tool execution failed: {str(e)}"
