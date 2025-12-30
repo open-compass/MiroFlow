@@ -27,6 +27,9 @@ COPY uv.lock /app/
 # Install Python dependencies using uv for faster installation
 RUN uv pip install --system --no-cache -r pyproject.toml
 
+# Install additional dependencies required by miroflow_service_fastapi.py
+RUN pip install --no-cache-dir fastapi uvicorn[standard]
+
 # Copy the entire project
 COPY . /app/
 
@@ -47,6 +50,7 @@ RUN chmod +x /app/start.sh
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV LOGGER_LEVEL=INFO
+ENV WORKERS=10
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
