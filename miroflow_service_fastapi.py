@@ -135,20 +135,20 @@ def _resolve_data_file(file_name: str) -> str:
     return ''
 
 
-def _validate_and_set_env_params(service_env_params: dict) -> Optional[str]:
+def _validate_and_build_env_config(service_env_params: dict) -> tuple[Optional[str], dict]:
     """
-    Validate and set tool API environment parameters required by MiroFlow.
-
-    Main model configuration (QWEN_*) is NOT handled here - it's passed via Hydra overrides.
+    Validate and build tool API environment configuration required by MiroFlow.
 
     Args:
         service_env_params: Dictionary of environment parameters from AgentCompass
 
     Returns:
-        Error message if validation fails, None otherwise
+        Tuple of (error_message, env_config_dict)
     """
     if not service_env_params:
         service_env_params = {}
+
+    env_config = {}
 
     # Required parameters
     required_params = [
@@ -169,6 +169,12 @@ def _validate_and_set_env_params(service_env_params: dict) -> Optional[str]:
 
     # Optional parameters with default values (use "$ENV_VAR" to reference other env vars)
     optional_params = {
+        # tool-reasoning and tool-image-video: Anthropic API (optional, defaults to dummy)
+        "ANTHROPIC_API_KEY": "dummy-key",
+        "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
+        "ANTHROPIC_MODEL_NAME": "claude-3-7-sonnet-20250219",
+        # tool-image-video: Gemini API for YouTube video analysis (optional, defaults to dummy)
+        "GEMINI_API_KEY": "dummy-key",
         # tool-image-video triplet (defaults to OPENROUTER_* values)
         "VISION_API_KEY": "$OPENROUTER_API_KEY",
         "VISION_BASE_URL": "$OPENROUTER_BASE_URL",
@@ -178,6 +184,9 @@ def _validate_and_set_env_params(service_env_params: dict) -> Optional[str]:
         "AUDIO_BASE_URL": "$OPENROUTER_BASE_URL",
         "AUDIO_TRANSCRIPTION_MODEL_NAME": "gpt-4o-mini-transcribe",
         "AUDIO_MODEL_NAME": "gpt-4o-audio-preview",
+        # hint generation and final answer extraction: OpenAI API (defaults to OPENROUTER_* values)
+        "OPENAI_API_KEY": "$OPENROUTER_API_KEY",
+        "OPENAI_BASE_URL": "$OPENROUTER_BASE_URL",
         # hint generation triplet (defaults to OPENROUTER_* values)
         "HINT_LLM_API_KEY": "$OPENROUTER_API_KEY",
         "HINT_LLM_BASE_URL": "$OPENROUTER_BASE_URL",
@@ -188,41 +197,41 @@ def _validate_and_set_env_params(service_env_params: dict) -> Optional[str]:
         "FINAL_ANSWER_LLM_MODEL_NAME": "$OPENROUTER_MODEL_NAME",
     }
 
-    # Validate and set required parameters
+    # Validate required parameters
     missing_params = []
     for param in required_params:
         value = service_env_params.get(param)
         if not value or not str(value).strip():
             missing_params.append(param)
         else:
-            os.environ[param] = str(value).strip()
+            env_config[param] = str(value).strip()
 
     if missing_params:
-        return f"Missing required service_env_params: {', '.join(missing_params)}"
+        return f"Missing required service_env_params: {', '.join(missing_params)}", {}
 
-    # Set required parameters with defaults (use provided value or default)
+    # Set required parameters with defaults
     for param, default_value in required_params_with_defaults.items():
         value = service_env_params.get(param)
         if value and str(value).strip():
-            os.environ[param] = str(value).strip()
+            env_config[param] = str(value).strip()
         else:
-            os.environ[param] = default_value
+            env_config[param] = default_value
 
     # Set optional parameters (use provided value or default)
     for param, default_value in optional_params.items():
         value = service_env_params.get(param)
         if value and str(value).strip():
-            os.environ[param] = str(value).strip()
+            env_config[param] = str(value).strip()
         elif default_value is not None:
             # Handle $ENV_VAR references
             if isinstance(default_value, str) and default_value.startswith("$"):
                 ref_var = default_value[1:]
-                os.environ[param] = os.environ.get(ref_var, "")
+                env_config[param] = env_config.get(ref_var, "")
             else:
-                os.environ[param] = default_value
+                env_config[param] = default_value
 
-    logger.info("Tool API environment variables configured successfully")
-    return None
+    logger.info("Tool API environment config built successfully")
+    return None, env_config
 
 
 def _build_llm_config_overrides(llm_config: dict) -> list:
@@ -320,16 +329,18 @@ async def _run_miroflow_task(
     task_description: str,
     task_file_name: str,
     llm_config: dict,
+    tool_env_config: dict,
 ) -> tuple[str, str, str, dict, dict, str]:
     """
     Execute a MiroFlow task with AgentCompass gateway configuration.
 
     Args:
-        config_name: MiroFlow config name (e.g., "agent_gaia-validation-text-only")
+        config_name: MiroFlow config name
         task_id: Task identifier
         task_description: Task description/question
         task_file_name: Optional file path for task
         llm_config: LLM configuration from AgentCompass gateway
+        tool_env_config: Environment configuration for tools
 
     Returns:
         Tuple of (final_answer, boxed_answer, status, trajectory, usage_stats, error)
@@ -353,13 +364,13 @@ async def _run_miroflow_task(
 
         # Create pipeline components
         main_agent_tool_manager, sub_agent_tool_managers, output_formatter = (
-            create_pipeline_components(cfg, logs_dir=str(logs_dir))
+            create_pipeline_components(cfg, logs_dir=str(logs_dir), tool_env_config=tool_env_config)
         )
 
         # Create log path
         log_path = logs_dir / f"{task_id}.log"
 
-        # Execute task pipeline - now returns trajectory and usage_stats
+        # Execute task pipeline
         final_answer, boxed_answer, log_file_path, trajectory, usage_stats = await execute_task_pipeline(
             cfg=cfg,
             task_name=task_id,
@@ -372,6 +383,7 @@ async def _run_miroflow_task(
             log_path=log_path,
             ground_truth=None,
             metadata=None,
+            tool_env_config=tool_env_config,
         )
 
         return final_answer, boxed_answer, "completed", trajectory, usage_stats, None
@@ -404,9 +416,9 @@ async def run_task(request: TaskRequest):
             detail="llm_config must contain model_name, url, and api_key"
         )
 
-    # Validate and set tool environment parameters
+    # Validate and build tool environment config
     service_env_params = payload.get('service_env_params') or {}
-    env_error = _validate_and_set_env_params(service_env_params)
+    env_error, tool_env_config = _validate_and_build_env_config(service_env_params)
     if env_error:
         logger.error(f"Environment parameter validation failed: {env_error}")
         raise HTTPException(status_code=400, detail=env_error)
@@ -431,13 +443,14 @@ async def run_task(request: TaskRequest):
     logger.info(f"  Model: {llm_config.get('model_name')}")
     logger.info(f"  Gateway: {llm_config.get('url')}")
 
-    # Execute MiroFlow task - now returns trajectory and usage_stats
+    # Execute MiroFlow task
     final_answer, boxed_answer, status, trajectory, usage_stats, error = await _run_miroflow_task(
         config_name=config_name,
         task_id=task_id,
         task_description=task_description,
         task_file_name=task_file_name,
         llm_config=llm_config,
+        tool_env_config=tool_env_config,
     )
 
     if status == "failed":

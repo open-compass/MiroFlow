@@ -20,9 +20,15 @@ import requests
 from fastmcp import FastMCP
 from src.logging.logger import setup_mcp_logging
 
-VISION_API_KEY = os.environ.get("VISION_API_KEY")
-VISION_BASE_URL = os.environ.get("VISION_BASE_URL")
-VISION_MODEL_NAME = os.environ.get("VISION_MODEL_NAME")
+
+def _get_env_config():
+    """Get environment configuration at runtime to support per-request isolation."""
+    return {
+        "VISION_API_KEY": os.environ.get("VISION_API_KEY"),
+        "env_config["VISION_BASE_URL"]": os.environ.get("env_config["VISION_BASE_URL"]"),
+        "env_config["VISION_MODEL_NAME"]": os.environ.get("env_config["VISION_MODEL_NAME"]"),
+    }
+
 
 # Initialize FastMCP server
 setup_mcp_logging(tool_name=os.path.basename(__file__))
@@ -54,6 +60,7 @@ async def visual_question_answering(image_path_or_url: str, question: str) -> st
     Returns:
         The answer to the image-related question.
     """
+    env_config = _get_env_config()
     messages_for_llm = [
         {
             "role": "user",
@@ -68,7 +75,7 @@ async def visual_question_answering(image_path_or_url: str, question: str) -> st
     ]
 
     headers = {
-        "Authorization": f"Bearer {VISION_API_KEY}",
+        "Authorization": f"Bearer {env_config['VISION_API_KEY']}",
         "Content-Type": "application/json",
     }
 
@@ -100,9 +107,9 @@ async def visual_question_answering(image_path_or_url: str, question: str) -> st
         else:
             messages_for_llm[0]["content"][0]["image_url"]["url"] = image_path_or_url
 
-        payload = {"model": VISION_MODEL_NAME, "messages": messages_for_llm}
+        payload = {"model": env_config["VISION_MODEL_NAME"], "messages": messages_for_llm}
 
-        response = requests.post(VISION_BASE_URL, json=payload, headers=headers)
+        response = requests.post(env_config["VISION_BASE_URL"], json=payload, headers=headers)
 
     except Exception as e:
         return f"Error: {e}"

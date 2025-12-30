@@ -27,9 +27,15 @@ from mutagen import File as MutagenFile
 from openai import OpenAI
 from src.logging.logger import setup_mcp_logging
 
-WHISPER_API_KEY = os.environ.get("WHISPER_API_KEY")
-WHISPER_BASE_URL = os.environ.get("WHISPER_BASE_URL")
-WHISPER_MODEL_NAME = os.environ.get("WHISPER_MODEL_NAME")
+
+def _get_env_config():
+    """Get environment configuration at runtime to support per-request isolation."""
+    return {
+        "WHISPER_API_KEY": os.environ.get("WHISPER_API_KEY"),
+        "WHISPER_BASE_URL": os.environ.get("WHISPER_BASE_URL"),
+        "env_config["WHISPER_MODEL_NAME"]": os.environ.get("env_config["WHISPER_MODEL_NAME"]"),
+    }
+
 
 # Initialize FastMCP server
 setup_mcp_logging(tool_name=os.path.basename(__file__))
@@ -143,17 +149,18 @@ async def audio_transcription(audio_path_or_url: str) -> str:
     Returns:
         The transcription of the audio file.
     """
+    env_config = _get_env_config()
     max_retries = 3
     retry = 0
     transcription = None
 
     while retry < max_retries:
         try:
-            client = OpenAI(base_url=WHISPER_BASE_URL, api_key=WHISPER_API_KEY)
+            client = OpenAI(base_url=env_config["WHISPER_BASE_URL"], api_key=env_config["WHISPER_API_KEY"])
             if os.path.exists(audio_path_or_url):  # Check if the file exists locally
                 with open(audio_path_or_url, "rb") as audio_file:
                     transcription = client.audio.transcriptions.create(
-                        model=WHISPER_MODEL_NAME, file=audio_file
+                        model=env_config["WHISPER_MODEL_NAME"], file=audio_file
                     )
             elif "home/user" in audio_path_or_url:
                 return "[ERROR]: The audio_transcription tool cannot access to sandbox file, please use the local path provided by original instruction"
@@ -189,7 +196,7 @@ async def audio_transcription(audio_path_or_url: str) -> str:
                 try:
                     with open(temp_audio_path, "rb") as audio_file:
                         transcription = client.audio.transcriptions.create(
-                            model=WHISPER_MODEL_NAME, file=audio_file
+                            model=env_config["WHISPER_MODEL_NAME"], file=audio_file
                         )
                 finally:
                     # Clean up the temp file

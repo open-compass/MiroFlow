@@ -14,17 +14,16 @@ from src.logging.logger import setup_mcp_logging
 setup_mcp_logging(tool_name=os.path.basename(__file__))
 mcp = FastMCP("e2b-python-interpreter")
 
-# API keys
-E2B_API_KEY = os.environ.get("E2B_API_KEY")
-LOGS_DIR = os.environ.get("LOGS_DIR")  # Directory where benchmark logs are stored
 
-# DEFAULT TEMPLATE ID
-# see README.md on how to build this
-DEFAULT_TEMPLATE_ID = os.environ.get("DEFAULT_TEMPLATE_ID", "all_pip_apt_pkg")
-
-# DEFAULT CONFS
-DEFAULT_TIMEOUT = os.environ.get("DEFAULT_TIMEOUT", "1800")  # seconds
-DEFAULT_TIMEOUT = int(DEFAULT_TIMEOUT)
+def _get_env_config():
+    """Get environment configuration at runtime to support per-request isolation."""
+    default_timeout = os.environ.get("env_config["DEFAULT_TIMEOUT"]", "1800")
+    return {
+        "env_config["E2B_API_KEY"]": os.environ.get("env_config["E2B_API_KEY"]"),
+        "env_config["LOGS_DIR"]": os.environ.get("env_config["LOGS_DIR"]"),
+        "DEFAULT_TEMPLATE_ID": os.environ.get("DEFAULT_TEMPLATE_ID", "all_pip_apt_pkg"),
+        "env_config["DEFAULT_TIMEOUT"]": int(default_timeout),
+    }
 
 # Common packages to install in sandbox
 COMMON_PACKAGES = [
@@ -145,20 +144,21 @@ async def create_sandbox() -> str:
     Returns:
         The `sandbox_id` of the newly created sandbox. You should use this `sandbox_id` to run other tools in the sandbox.
     """
+    env_config = _get_env_config()
     max_retries = 5
     for attempt in range(1, max_retries + 1):
         sandbox = None
         try:
             sandbox = Sandbox(
-                template=DEFAULT_TEMPLATE_ID,
-                timeout=DEFAULT_TIMEOUT,
-                api_key=E2B_API_KEY,
+                template=env_config["DEFAULT_TEMPLATE_ID"],
+                timeout=env_config["env_config["DEFAULT_TIMEOUT"]"],
+                api_key=env_config["env_config["E2B_API_KEY"]"],
             )
             info = sandbox.get_info()
 
             # Install common packages before running code
             # await _install_common_packages(sandbox, info.sandbox_id)
-            tmpfiles_dir = os.path.join(LOGS_DIR, "tmpfiles")
+            tmpfiles_dir = os.path.join(env_config["env_config["LOGS_DIR"]"], "tmpfiles")
             os.makedirs(tmpfiles_dir, exist_ok=True)
 
             return f"Sandbox created with sandbox_id: {info.sandbox_id}"
@@ -169,7 +169,7 @@ async def create_sandbox() -> str:
         finally:
             # Set timeout before exit to prevent timeout after function exits
             try:
-                sandbox.set_timeout(DEFAULT_TIMEOUT)
+                sandbox.set_timeout(env_config["env_config["DEFAULT_TIMEOUT"]"])
             except Exception:
                 pass  # Ignore timeout setting errors
 
@@ -186,9 +186,10 @@ async def run_command(sandbox_id: str, command: str) -> str:
     Returns:
         A result of the command execution, format like (stderr=..., stdout=..., exit_code=..., error=...)
     """
+    env_config = _get_env_config()
     sandbox = None
     try:
-        sandbox = Sandbox.connect(sandbox_id, api_key=E2B_API_KEY)
+        sandbox = Sandbox.connect(sandbox_id, api_key=env_config["env_config["E2B_API_KEY"]"])
     except Exception:
         return f"[ERROR]: Failed to connect to sandbox {sandbox_id}, retry later. Make sure the sandbox is created and the id is correct."
 
@@ -196,7 +197,7 @@ async def run_command(sandbox_id: str, command: str) -> str:
     for attempt in range(1, max_retries + 1):
         try:
             sandbox.set_timeout(
-                DEFAULT_TIMEOUT
+                env_config["env_config["DEFAULT_TIMEOUT"]"]
             )  # refresh the timeout for each command execution
             result = sandbox.commands.run(command)
 
@@ -219,7 +220,7 @@ async def run_command(sandbox_id: str, command: str) -> str:
         finally:
             # Set timeout before exit to prevent timeout after function exits
             try:
-                sandbox.set_timeout(DEFAULT_TIMEOUT)
+                sandbox.set_timeout(env_config["env_config["DEFAULT_TIMEOUT"]"])
             except Exception:
                 pass  # Ignore timeout setting errors
 
@@ -236,9 +237,10 @@ async def run_python_code(sandbox_id: str, code_block: str) -> str:
     Returns:
         A result of the command execution, format like (stderr=..., stdout=..., exit_code=..., error=...)
     """
+    env_config = _get_env_config()
     sandbox = None
     try:
-        sandbox = Sandbox.connect(sandbox_id=sandbox_id, api_key=E2B_API_KEY)
+        sandbox = Sandbox.connect(sandbox_id=sandbox_id, api_key=env_config["env_config["E2B_API_KEY"]"])
     except Exception:
         return f"[ERROR]: Failed to connect to sandbox {sandbox_id}, retry later. Make sure the sandbox is created and the id is correct."
 
@@ -246,7 +248,7 @@ async def run_python_code(sandbox_id: str, code_block: str) -> str:
     for attempt in range(1, max_retries + 1):
         try:
             sandbox.set_timeout(
-                DEFAULT_TIMEOUT
+                env_config["DEFAULT_TIMEOUT"]
             )  # refresh the timeout for each command execution
 
             execution = sandbox.run_code(code_block)
@@ -258,7 +260,7 @@ async def run_python_code(sandbox_id: str, code_block: str) -> str:
         finally:
             # Set timeout before exit to prevent timeout after function exits
             try:
-                sandbox.set_timeout(DEFAULT_TIMEOUT)
+                sandbox.set_timeout(env_config["DEFAULT_TIMEOUT"])
             except Exception:
                 pass  # Ignore timeout setting errors
 
@@ -277,15 +279,16 @@ async def upload_file_from_local_to_sandbox(
     Returns:
         The path of the uploaded file in the sandbox if the upload is successful.
     """
+    env_config = _get_env_config()
     sandbox = None
     try:
-        sandbox = Sandbox.connect(sandbox_id, api_key=E2B_API_KEY)
+        sandbox = Sandbox.connect(sandbox_id, api_key=env_config["E2B_API_KEY"])
     except Exception:
         return f"[ERROR]: Failed to connect to sandbox {sandbox_id}, retry later. Make sure the sandbox is created and the id is correct."
 
     try:
         sandbox.set_timeout(
-            DEFAULT_TIMEOUT
+            env_config["DEFAULT_TIMEOUT"]
         )  # refresh the timeout for each command execution
 
         # Get the uploaded file path
@@ -303,7 +306,7 @@ async def upload_file_from_local_to_sandbox(
     finally:
         # Set timeout before exit to prevent timeout after function exits
         try:
-            sandbox.set_timeout(DEFAULT_TIMEOUT)
+            sandbox.set_timeout(env_config["DEFAULT_TIMEOUT"])
         except Exception:
             pass  # Ignore timeout setting errors
 
@@ -323,15 +326,16 @@ async def download_file_from_internet_to_sandbox(
     Returns:
         The path of the downloaded file in the sandbox if the download is successful.
     """
+    env_config = _get_env_config()
     sandbox = None
     try:
-        sandbox = Sandbox.connect(sandbox_id, api_key=E2B_API_KEY)
+        sandbox = Sandbox.connect(sandbox_id, api_key=env_config["E2B_API_KEY"])
     except Exception:
         return f"[ERROR]: Failed to connect to sandbox {sandbox_id}, retry later. Make sure the sandbox is created and the id is correct."
 
     try:
         sandbox.set_timeout(
-            DEFAULT_TIMEOUT
+            env_config["DEFAULT_TIMEOUT"]
         )  # refresh the timeout for each command execution
 
         downloaded_file_path = os.path.join(sandbox_file_path, os.path.basename(url))
@@ -352,7 +356,7 @@ async def download_file_from_internet_to_sandbox(
     finally:
         # Set timeout before exit to prevent timeout after function exits
         try:
-            sandbox.set_timeout(DEFAULT_TIMEOUT)
+            sandbox.set_timeout(env_config["DEFAULT_TIMEOUT"])
         except Exception:
             pass  # Ignore timeout setting errors
 
@@ -371,22 +375,23 @@ async def download_file_from_sandbox_to_local(
     Returns:
         The local path of the downloaded file if successful, otherwise error message.
     """
+    env_config = _get_env_config()
     sandbox = None
     try:
-        sandbox = Sandbox.connect(sandbox_id, api_key=E2B_API_KEY)
+        sandbox = Sandbox.connect(sandbox_id, api_key=env_config["E2B_API_KEY"])
     except Exception:
         return f"[ERROR]: Failed to connect to sandbox {sandbox_id}, retry later. Make sure the sandbox is created and the id is correct."
 
     try:
         sandbox.set_timeout(
-            DEFAULT_TIMEOUT
+            env_config["DEFAULT_TIMEOUT"]
         )  # refresh the timeout for each command execution
 
         # Create tmpfiles directory if it doesn't exist
-        if not LOGS_DIR:
+        if not env_config["LOGS_DIR"]:
             return "[ERROR]: LOGS_DIR environment variable is not set. Cannot determine where to save the file."
 
-        tmpfiles_dir = os.path.join(LOGS_DIR, "tmpfiles")
+        tmpfiles_dir = os.path.join(env_config["LOGS_DIR"], "tmpfiles")
         os.makedirs(tmpfiles_dir, exist_ok=True)
 
         # Determine local filename
@@ -408,7 +413,7 @@ async def download_file_from_sandbox_to_local(
     finally:
         # Set timeout before exit to prevent timeout after function exits
         try:
-            sandbox.set_timeout(DEFAULT_TIMEOUT)
+            sandbox.set_timeout(env_config["DEFAULT_TIMEOUT"])
         except Exception:
             pass  # Ignore timeout setting errors
 

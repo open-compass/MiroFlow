@@ -23,9 +23,15 @@ from src.logging.logger import setup_mcp_logging
 
 logger = logging.getLogger("miroflow")
 
-REASONING_API_KEY = os.environ.get("REASONING_API_KEY")
-REASONING_BASE_URL = os.environ.get("REASONING_BASE_URL")
-REASONING_MODEL_NAME = os.environ.get("REASONING_MODEL_NAME")
+
+def _get_env_config():
+    """Get environment configuration at runtime to support per-request isolation."""
+    return {
+        "REASONING_API_KEY": os.environ.get("REASONING_API_KEY"),
+        "REASONING_BASE_URL": os.environ.get("REASONING_BASE_URL"),
+        "REASONING_MODEL_NAME": os.environ.get("REASONING_MODEL_NAME"),
+    }
+
 
 # Initialize FastMCP server
 setup_mcp_logging(tool_name=os.path.basename(__file__))
@@ -75,18 +81,19 @@ async def reasoning(question: str) -> str:
     Returns:
         The answer to the question.
     """
+    env_config = _get_env_config()
     payload = {
-        "model": REASONING_MODEL_NAME,
+        "model": env_config["REASONING_MODEL_NAME"],
         "messages": [{"role": "user", "content": question}],
         "temperature": 0.6,
         "top_p": 0.95,
     }
     headers = {
-        "Authorization": f"Bearer {REASONING_API_KEY}",
+        "Authorization": f"Bearer {env_config['REASONING_API_KEY']}",
         "Content-Type": "application/json",
     }
 
-    response = post_with_retry(REASONING_BASE_URL, json=payload, headers=headers)
+    response = post_with_retry(env_config["REASONING_BASE_URL"], json=payload, headers=headers)
     if response is None:
         return "Reasoning service unavailable. Please try again later."
 

@@ -19,8 +19,14 @@ from src.logging.logger import setup_mcp_logging
 
 setup_mcp_logging(tool_name=os.path.basename(__file__))
 mcp = FastMCP("reading-mcp-server")
-SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "")
-JINA_API_KEY = os.environ.get("JINA_API_KEY", "")
+
+
+def _get_env_config():
+    """Get environment configuration at runtime to support per-request isolation."""
+    return {
+        "SERPER_API_KEY": os.environ.get("SERPER_API_KEY", ""),
+        "JINA_API_KEY": os.environ.get("JINA_API_KEY", ""),
+    }
 
 
 @mcp.tool()
@@ -70,11 +76,12 @@ async def read_file(uri: str) -> str:
                 if retry_count > 3:
                     # Try scrape_website tool as fallback
                     try:
+                        env_config = _get_env_config()
                         scrape_result = await smart_request(
                             uri,
                             env={
-                                "SERPER_API_KEY": SERPER_API_KEY,
-                                "JINA_API_KEY": JINA_API_KEY,
+                                "SERPER_API_KEY": env_config["SERPER_API_KEY"],
+                                "JINA_API_KEY": env_config["JINA_API_KEY"],
                             },
                         )
                         return f"[INFO]: Download failed, automatically tried `scrape_website` tool instead.\n\n{scrape_result}"

@@ -20,7 +20,7 @@ LOGGER_LEVEL = os.getenv("LOGGER_LEVEL", "INFO")
 logger = bootstrap_logger(level=LOGGER_LEVEL)
 
 
-def _extract_trajectory_from_task_log(task_log: TaskTracer) -> dict:
+def _extract_trajectory_from_task_log(task_log: TaskTracer, tool_env_config: dict | None = None) -> dict:
     """
     Extract full trajectory from TaskTracer for AgentCompass compatibility.
 
@@ -28,9 +28,11 @@ def _extract_trajectory_from_task_log(task_log: TaskTracer) -> dict:
     - main_agent_message_history: Full message history of the main agent
     - sub_agent_message_history_sessions: Message histories of all sub-agent sessions
     - step_logs: Detailed step-by-step execution logs
+    - tool_models: Tool model configuration used in this task
 
     Args:
         task_log: TaskTracer instance containing execution logs
+        tool_env_config: Environment configuration for tools
 
     Returns:
         Dictionary containing the full trajectory structure
@@ -46,11 +48,23 @@ def _extract_trajectory_from_task_log(task_log: TaskTracer) -> dict:
             "metadata": step.metadata if hasattr(step, 'metadata') else {}
         })
 
+    # Extract tool model info from tool_env_config
+    tool_models = {}
+    if tool_env_config:
+        tool_models = {
+            "vision_model": tool_env_config.get("VISION_MODEL_NAME", ""),
+            "audio_model": tool_env_config.get("AUDIO_MODEL_NAME", ""),
+            "reasoning_model": tool_env_config.get("OPENROUTER_MODEL_NAME", ""),
+            "hint_llm_model": tool_env_config.get("HINT_LLM_MODEL_NAME", ""),
+            "final_answer_llm_model": tool_env_config.get("FINAL_ANSWER_LLM_MODEL_NAME", ""),
+        }
+
     # Return full trajectory structure
     trajectory = {
         "main_agent_message_history": task_log.main_agent_message_history or {},
         "sub_agent_message_history_sessions": task_log.sub_agent_message_history_sessions or {},
-        "step_logs": step_logs_serializable
+        "step_logs": step_logs_serializable,
+        "tool_models": tool_models,
     }
 
     return trajectory
@@ -68,6 +82,7 @@ async def execute_task_pipeline(
     log_path: pathlib.Path,
     ground_truth: str | None = None,
     metadata: dict | None = None,
+    tool_env_config: dict | None = None,
 ) -> tuple[str, str, pathlib.Path, dict, dict]:
     """
     Executes the full pipeline for a single task.
@@ -147,6 +162,7 @@ async def execute_task_pipeline(
             output_formatter=output_formatter,
             task_log=task_log,
             cfg=cfg,
+            tool_env_config=tool_env_config,
         )
 
         task_log.status = "running"
@@ -207,24 +223,26 @@ async def execute_task_pipeline(
         logger.debug(f"--- Finished Task Execution: {task_id} ---")
 
         # Extract trajectory from task log
-        trajectory = _extract_trajectory_from_task_log(task_log)
+        trajectory = _extract_trajectory_from_task_log(task_log, tool_env_config)
 
         return final_answer, final_boxed_answer, task_log.log_path, trajectory, usage_stats
 
 
-def create_pipeline_components(cfg: DictConfig, logs_dir: str | None = None):
+def create_pipeline_components(cfg: DictConfig, logs_dir: str | None = None, tool_env_config: dict | None = None):
     """
     Creates and initializes the core components of the agent pipeline.
 
     Args:
         cfg: The Hydra configuration object.
+        logs_dir: The directory to save logs.
+        tool_env_config: Environment configuration for tools (API keys, etc.) to be passed to subprocesses.
 
     Returns:
         Tuple of (main_agent_tool_manager, sub_agent_tool_managers, output_formatter)
     """
     # Create ToolManagers for main agent and sub-agents
     main_agent_mcp_server_configs, main_agent_blacklist = create_mcp_server_parameters(
-        cfg, cfg.main_agent, logs_dir
+        cfg, cfg.main_agent, logs_dir, tool_env_config
     )
     main_agent_tool_manager = ToolManager(
         main_agent_mcp_server_configs,
@@ -235,7 +253,7 @@ def create_pipeline_components(cfg: DictConfig, logs_dir: str | None = None):
     if cfg.sub_agents is not None and cfg.sub_agents:
         for sub_agent in cfg.sub_agents:
             sub_agent_mcp_server_configs, sub_agent_blacklist = (
-                create_mcp_server_parameters(cfg, cfg.sub_agents[sub_agent], logs_dir)
+                create_mcp_server_parameters(cfg, cfg.sub_agents[sub_agent], logs_dir, tool_env_config)
             )
             sub_agent_tool_manager = ToolManager(
                 sub_agent_mcp_server_configs,

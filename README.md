@@ -1,236 +1,489 @@
-<div align="center">
-  <img src="docs/mkdocs/docs/assets/miroflow_logo.png" width="45%" alt="MiroFlow" />
-</div>
+# MiroFlow Service for AgentCompass
 
-<br> 
+MiroFlow FastAPI service for integration with AgentCompass service-type benchmarks.
 
+## Introduction
 
-<div align="center">
+`miroflow_service_fastapi.py` is a FastAPI-based HTTP service that wraps the MiroFlow Agent framework as a RESTful API, enabling integration with the AgentCompass system. The service receives task requests, processes them using MiroFlow's asynchronous execution engine, and returns structured results.
 
-[![DEMO](https://img.shields.io/badge/Demo-FFB300?style=for-the-badge&logo=airplayvideo&logoColor=white)](https://dr.miromind.ai/)
-[![MODELS](https://img.shields.io/badge/Models-5EDDD2?style=for-the-badge&logo=huggingface&logoColor=ffffff&labelColor)](https://huggingface.co/collections/miromind-ai/mirothinker-v02-68af084a18035f57b17cd902)
-[![DATA](https://img.shields.io/badge/Data-0040A1?style=for-the-badge&logo=huggingface&logoColor=ffffff&labelColor)](https://huggingface.co/datasets/miromind-ai/MiroVerse-v0.1)
-[![BLOG](https://img.shields.io/badge/Blog-4285F4?style=for-the-badge&logo=google-chrome&logoColor=white)](https://miromind.ai/blog/miroflow)
+## Features
 
-[![GITHUB](https://img.shields.io/badge/Github-24292F?style=for-the-badge&logo=github&logoColor=white)](https://github.com/MiroMindAI)
-[![DISCORD](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/invite/GPqEnkzQZd)
-[![WeChat](https://img.shields.io/badge/WeChat-07C160?style=for-the-badge&logo=wechat&logoColor=white)](https://raw.githubusercontent.com/MiroMindAI/MiroThinker/refs/heads/main/assets/miromind_wechat.png)
-[![RedNote](https://img.shields.io/badge/RedNote-FF2442?style=for-the-badge&logo=revoltdotchat&logoColor=white)](https://www.xiaohongshu.com/user/profile/5e353bd80000000001000239)
+- ✅ Fully compatible with AgentCompass service-type interface specification
+- ✅ Supports asynchronous execution and multi-worker concurrent processing
+- ✅ Automatic extraction of execution trajectory
+- ✅ Token usage statistics for the main tested model
+- ✅ Model invocation through AgentCompass llm_gateway
+- ✅ Supports multiple benchmarks including GAIA, HLE, etc.
 
-</div>
+## Quick Start
 
-<div align="center">
-
-## 📚 **[READ THE DOCUMENTATION](https://miromindai.github.io/MiroFlow/)**
-
-### 🚀 [Try Demo](https://dr.miromind.ai/) ｜ [中文](README_zh.md) ｜ [日本語](README_ja.md)
-
-</div>
-
-<div align="center">
-  <img width="100%" alt="image" src="docs/mkdocs/docs/assets/futurex-09-12.png" />
-</div>
-
----
-
-This repo is the official implementation of the **MiroMind Research Agent Project**. It is a leading-performance, fully open-source system designed to perform multi-step internet research for addressing complex challenges such as future event prediction. The project currently comprises four key components:
-
-- 🤖 **MiroFlow**: an open-source research agent framework that offers reproducible state-of-the-art performance on representative benchmarks (e.g., FutureX, GAIA, HLE, xBench-DeepSearch, and BrowserComp benchmarks), included in this repo. See [[Get Started in Under 5 Minutes]](#-get-started-in-under-5-minutes) for a quick start.
-- 🤔 **MiroThinker**: an open-source agent foundation model that natively supports tool-assisted reasoning. See [MiroThinker](https://github.com/MiroMindAI/mirothinker).
-- 📊 **MiroVerse**: 147k premium open-source training data supporting research agent training. See [MiroVerse](https://huggingface.co/datasets/miromind-ai/MiroVerse-v0.1).
-- 🚧 **MiroTrain / MiroRL**: The training infra that supports stable and efficient training for the research agent models. See [MiroTrain](https://github.com/MiroMindAI/MiroTrain) / [MiroRL](https://github.com/MiroMindAI/MiroRL)
-
----
-
-## 📋 Table of Contents
-
-- 📰 [News & Updates](#-news--updates)
-- 🚀 [Get Started in Under 5 Minutes](#-get-started-in-under-5-minutes)
-- 🤖 [What is MiroFlow?](#-what-is-miroflow)
-- 🌟 [Highlights](#-Highlights)
-- 📈 [Performance on Benchmarks](#-performance-on-benchmarks)
-- 🔧 [Supported Models & Tools](#-supported-models--tools)
-- ❓ [FAQ](#-faq)
-- 🤝 [Contributing](#-contributing)
-- 📄 [License](#-license)
-- 🙏 [Acknowledgments](#-acknowledgments-and-contributors)
-
----
-
-## 📰 News & Updates
-
-- **[2025-09-15]**: 🎉🎉 **MiroFlow v0.3**: Enhanced codebase architecture and significantly improved benchmark performance, boosting GPT-5's prediction accuracy for future events by 11%.
- MiroFlow now ranks #1 in the future prediction benchmark. See [FutureX](https://futurex-ai.github.io/).
-- **[2025-08-27]**: **MiroFlow v0.2**: Achieves state-of-the-art performance across [multiple agentic benchmarks](https://miromind.ai/blog/miroflow), including HLE (27.2%), HLE-Text-Only (29.5%), BrowserComp-EN (33.2%), BrowserComp-ZH (47.1%), and xBench-DeepSearch (72.0%).
-- **[2025-08-26]**: Released [GAIA Validation Trace](docs/public_trace.md) (73.94% pass@1) and [Gradio Demo](https://github.com/MiroMindAI/MiroThinker/tree/main/apps/gradio-demo) for local deployment.
-- **[2025-08-08]**: **MiroFlow v0.1**: Complete open-source release of the research agent framework.
-
----
-
-## 🚀 Get Started in Under 5 Minutes
-
-### 📋 Prerequisites
-
-- **Python**: 3.12 or higher
-- **Package Manager**: [`uv`](https://docs.astral.sh/uv/)
-- **Operating System**: Linux, macOS
-
-### ⚡ Quick Setup
-
-**Example**: Intelligent document analysis with file processing capabilities.
+### 1. Install Dependencies
 
 ```bash
-# 1. Clone and setup
-git clone https://github.com/MiroMindAI/MiroFlow && cd MiroFlow
-uv sync
+cd MiroFlow
 
-# 2. Configure API key
-cp .env.template .env
-# Edit .env and add your OPENROUTER_API_KEY
+# Install FastAPI and uvicorn
+pip install fastapi uvicorn
 
-# 3. Run your first agent
-uv run main.py trace --config_file_name=agent_quickstart_reading --task="What is the first country listed in the XLSX file that have names starting with Co?" --task_file_name="data/FSI-2023-DOWNLOAD.xlsx"
+# Install MiroFlow and its dependencies (from pyproject.toml)
+pip install -e .
 ```
 
-🎉 **Expected Output:** Your agent should return **\boxed{Congo Democratic Republic}** 😊
+> **Note**: `uv` is a Python package management tool required by the `markitdown-mcp` server to manage dependencies for file reading tools. If `uv` is missing, file reading functionality will fail with the error: `[Errno 2] No such file or directory: 'uv'`
 
-> **💡 Tip:** If you encounter issues, check that your API key is correctly set in the `.env` file and that all dependencies are installed.
+### 2. Configure Environment Variables (Optional)
 
----
+If you need to configure proxy or log level, create a `.env` file:
 
-## 🤖 What is MiroFlow?
+```bash
+# Log level (optional, default: INFO)
+LOGGER_LEVEL=INFO
 
-MiroFlow is a high-performance, modular framework for building intelligent AI agents that deliver state-of-the-art results on complex reasoning tasks like future event prediction. The framework features advanced multi-turn conversation capabilities, extensive tool ecosystem integration, and hierarchical sub-agent orchestration for optimal task completion. Learn more about our [agent framework](https://miromindai.github.io/MiroFlow/core_concepts/).
+# HTTP proxy (optional)
+HTTP_PROXY=http://127.0.0.1:7890
+HTTPS_PROXY=http://127.0.0.1:7890
 
-<div align="center">
-<img src="docs/mkdocs/docs/assets/miroflow_architecture.png" width="100%" alt="MiroFlow Architecture">
-</div>
-
-<table align="center" style="border: 1px solid #ccc; border-radius: 8px; padding: 12px; background-color: #f9f9f9; width: 60%;">
-  <tr>
-    <td style="text-align: center; padding: 10px;">
-      <strong>Research Assistant Demo</strong> - 
-      <span style="font-size: 0.9em; color: #555;">Read CVPR 2025 Best Paper and Provide Research Advice</span>
-      <br>
-      <video src="https://github.com/user-attachments/assets/99ed3172-6e9a-467a-9ccb-be45957fe2e4"
-             controls muted preload="metadata"
-             width="50%" height="50%"
-      </video>
-    </td>
-  </tr>
-</table>
-
----
-
-## 🌟 Highlights
-
-- **Reproducible State-of-the-Art Performance**: #1 ranking across [multiple representative agentic benchmarks](https://miromindai.github.io/MiroFlow/evaluation_overview/), including FutureX, GAIA, HLE, xBench-DeepSearch, and BrowserComp benchmarks)
-- **High Concurrency & Reliability**: Built with robust concurrency management and fault-tolerant design, MiroFlow efficiently handles rate-limited APIs and unstable networks, ensuring seamless trajectory collection and reliable execution of complex tasks.
-- **Cost-Effective Deployment**: Powered by the open-source MiroThinker model, MiroFlow can run a  research agent service on a single RTX 4090. The entire stack relies on free, open-source tools, making it simple to deploy, scale, and reproduce. See [MiroThinker](https://github.com/MiroMindAI/mirothinker).
-
----
-
-## 🔧 Supported Models & Tools
-
-- **Models**: GPT, Claude, Gemini, Qwen, MiroThinker, etc.
-- **Tools**: [Audio Transcription](https://github.com/MiroMindAI/MiroFlow/blob/miroflow-v0.3/src/tool/mcp_servers/audio_mcp_server.py), [Python](https://github.com/MiroMindAI/MiroFlow/blob/miroflow-v0.3/src/tool/mcp_servers/python_server.py), [File Reading](https://github.com/MiroMindAI/MiroFlow/blob/miroflow-v0.3/src/tool/mcp_servers/reading_mcp_server.py), [Reasoning](https://github.com/MiroMindAI/MiroFlow/blob/miroflow-v0.3/src/tool/mcp_servers/reasoning_mcp_server.py), [Google Search](https://github.com/MiroMindAI/MiroFlow/blob/miroflow-v0.3/src/tool/mcp_servers/searching_mcp_server.py), [VQA](https://github.com/MiroMindAI/MiroFlow/blob/miroflow-v0.3/src/tool/mcp_servers/vision_mcp_server.py), E2B, etc.
-
-
----
-
-## 📈 Performance on Benchmarks
-
-We achieved the #1 ranking on the FutureX Benchmark Leaderboard as of September 10, 2025, boosting GPT-5's prediction accuracy for future events by 11%.
-
-<div align="center">
-  <img width="100%" alt="image" src="docs/mkdocs/docs/assets/futurex-09-12.png" />
-</div>
-
-We benchmark MiroFlow on a series of benchmarks, including **GAIA**, **HLE**, **BrowseComp**, and **xBench-DeepSearch**, and achieved SOTA results.
-
-<img width="100%" alt="image" src="docs/mkdocs/docs/assets/benchmark_results.png" />
-
-| Model/Framework | GAIA Val | HLE | HLE-Text | BrowserComp-EN | BrowserComp-ZH | xBench-DeepSearch |
-|----------------|----------|-----|----------|----------------|----------------|-------------------|
-| **MiroFlow** | **82.4%** | **27.2%** | 29.5% | 33.2% | **47.1%** | **72.0%** |
-| OpenAI Deep Research | 67.4% | 26.6% | - | **51.5%** | 42.9% | - |
-| Gemini Deep Research | - | 26.9% | - | - | - | 50+% |
-| Kimi Researcher | - | - | 26.9% | - | - | 69.0% |
-| WebSailor-72B | 55.4% | - | - | - | 30.1% | 55.0% |
-| Manus | 73.3% | - | - | - | - | - |
-| DeepSeek v3.1 | - | - | **29.8%** | - | - | 71.2% |
-
-Follow our detailed guides to reproduce benchmark results in our [Benchmarks Documentation](https://miromindai.github.io/MiroFlow/evaluation_overview/)
-
----
-
-## ❓ FAQ
-
-<details>
-<summary><strong>What API keys do I need?</strong></summary>
-<br>
-You only need an OpenRouter API key to get started. OpenRouter provides access to multiple language models through a single API.
-</details>
-
-<details>
-<summary><strong>Can I use other language models besides OpenRouter?</strong></summary>
-<br>
-Yes, MiroFlow supports various language models. Check our documentation for configuration details.
-</details>
-
-<details>
-<summary><strong>How do I reproduce the benchmark results?</strong></summary>
-<br>
-Follow our detailed <a href="https://miromindai.github.io/MiroFlow/evaluation_overview/">Benchmarks Documentation</a> for step-by-step reproduction guides.
-</details>
-
-<details>
-<summary><strong>Is there commercial support available?</strong></summary>
-<br>
-For commercial inquiries and enterprise support, please contact us through our <a href="https://miromind.ai/">website</a>.
-</details>
-
----
-
-## 🤝 Contributing
-
-We welcome contributions from the community! Whether you're fixing bugs, adding features, or improving documentation, your help is appreciated.
-
-- 📋 **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/MiroMindAI/MiroFlow/issues).
-- 🔀 **Pull Requests**: Submit improvements via pull requests.
-- 💬 **Discussions**: Join our [Discord community](https://discord.com/invite/GPqEnkzQZd) for questions and discussions.
-
-
-## 📄 License
-
-This project is licensed under the Apache License 2.0.
-
-## 🙏 Acknowledgments
-
-**Benchmark Contributors** for the comprehensive evaluation datasets.
-
-**Open Source Community** for the tools and libraries that make this possible.
-
-We thank all contributors who have helped make MiroFlow better:
-
-<a href="https://github.com/MiroMindAI/MiroFlow/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=MiroMindAI/MiroFlow" />
-</a>
-
-Join our community and help us build the future of AI agents!
-
-## References
-
-The technical report is coming soon!
-
+# Data directory (optional, default: data/)
+DATA_DIR=data/
 ```
-@misc{2025mirothinker,
-    title={MiroFlow: A High-Performance Open-Source Research Agent Framework},
-    author={MiroMind AI Team},
-    howpublished={\url{https://github.com/MiroMindAI/MiroFlow}},
-    year={2025}
+
+> **Note**: Tool API configurations (such as OPENROUTER_API_KEY, SERPER_API_KEY, etc.) should NOT be configured in `.env`. They are passed through the `service_env_params` parameter in requests.
+
+### 3. Start the Service
+
+`miroflow_service_fastapi.py` supports two startup methods:
+
+#### Method 1: Run Script Directly (Recommended)
+
+```bash
+# Single worker mode (development/debugging)
+python miroflow_service_fastapi.py --host 0.0.0.0 --port 8082 --workers 1
+
+# Multi-worker mode (production, recommended)
+python miroflow_service_fastapi.py --host 0.0.0.0 --port 8082 --workers 4
+```
+
+**Command-line Arguments:**
+- `--host`: Host address to bind (default: 0.0.0.0)
+- `--port`: Port to listen on (default: 8082)
+- `--workers`: Number of worker processes (default: 1)
+
+#### Method 2: Start with uvicorn
+
+```bash
+# Single worker
+uvicorn miroflow_service_fastapi:app --host 0.0.0.0 --port 8082
+
+# Multi-worker
+uvicorn miroflow_service_fastapi:app --host 0.0.0.0 --port 8082 --workers 4
+```
+
+### 4. Verify Service is Running
+
+```bash
+curl http://localhost:8082/health
+```
+
+**Expected Response:**
+```json
+{
+  "status": "healthy",
+  "service": "miroflow"
 }
 ```
 
-[![Star History Chart](https://api.star-history.com/svg?repos=MiroMindAI/MiroFlow&type=Timeline)](https://www.star-history.com/#MiroMindAI/MiroFlow&Timeline)
+## API Reference
 
+### POST /api/tasks
+
+The main interface for executing MiroFlow tasks. This endpoint receives task descriptions and configurations, executes tasks using the MiroFlow Agent, and returns results.
+
+#### Request Example
+
+```bash
+curl -X POST "http://localhost:8082/api/tasks" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "params": {
+      "task_id": "task_001",
+      "question": "What is the capital of France?"
+    },
+    "llm_config": {
+      "model_name": "gpt-4o",
+      "url": "http://localhost:8001/v1",
+      "api_key": "sk-ac-noauth",
+      "request_timeout": 3600
+    },
+    "service_env_params": {
+      "OPENROUTER_API_KEY": "your-api-key",
+      "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
+      "SERPER_API_KEY": "your-serper-key",
+      "JINA_API_KEY": "your-jina-key",
+      "E2B_API_KEY": "your-e2b-key"
+    }
+  }'
+```
+
+#### Request Body Structure
+
+```json
+{
+  "params": {
+    "task_id": "task_001",
+    "question": "What is the capital of France?",
+    "metadata": {
+      "file_name": "optional_file.txt"
+    }
+  },
+  "llm_config": {
+    "model_name": "gpt-4o",
+    "url": "http://localhost:8001/v1",
+    "api_key": "sk-ac-noauth",
+    "model_infer_params": {
+      "temperature": 0.6,
+      "top_p": 0.95
+    },
+    "request_timeout": 3600
+  },
+  "service_env_params": {
+    "OPENROUTER_API_KEY": "your-api-key",
+    "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
+    "SERPER_API_KEY": "your-serper-key",
+    "JINA_API_KEY": "your-jina-key",
+    "E2B_API_KEY": "your-e2b-key"
+  }
+}
+```
+
+#### Request Parameters
+
+**1. params (Task Parameters)**
+
+| Parameter | Type | Required | Description |
+|------|------|------|------|
+| `params.question` | string | Yes | Task question/description |
+| `params.task_id` | string | No | Task ID, auto-generated if not provided (format: task_YYYYMMDD_HHMMSS_microseconds) |
+| `params.metadata.file_name` | string | No | Associated data file name (relative to DATA_DIR directory) |
+
+**2. llm_config (Main Model Configuration)**
+
+| Parameter | Type | Required | Description |
+|------|------|------|------|
+| `llm_config.model_name` | string | Yes | Model name (e.g., gpt-4o, claude-3-5-sonnet-20241022) |
+| `llm_config.url` | string | Yes | AgentCompass Gateway URL (e.g., http://localhost:8001/v1) |
+| `llm_config.api_key` | string | Yes | Gateway API key |
+| `llm_config.model_infer_params` | object | No | Inference parameters (temperature, top_p, etc.) |
+| `llm_config.request_timeout` | int | No | Request timeout in seconds (default: 1800) |
+
+**3. service_env_params (Tool API Configuration)**
+
+These parameters configure the various tool APIs used by MiroFlow. See the "Tool API Environment Variables" section below for details.
+
+#### Response Format
+
+**Success Response Example:**
+
+```json
+{
+  "final_answer": "Paris",
+  "trajectory": {
+    "main_agent_message_history": {
+      "messages": [
+        {"role": "user", "content": "What is the capital of France?"},
+        {"role": "assistant", "content": "Let me search for this information..."}
+      ]
+    },
+    "sub_agent_message_history_sessions": {},
+    "step_logs": [
+      {
+        "step_name": "search",
+        "message": "Searching for capital of France",
+        "timestamp": "2025-01-01T12:00:00",
+        "status": "completed",
+        "metadata": {}
+      }
+    ],
+    "tool_models": {
+      "vision_model": "gpt-4o",
+      "audio_model": "gpt-4o-audio-preview",
+      "reasoning_model": "gpt-5",
+      "hint_llm_model": "gpt-5",
+      "final_answer_llm_model": "gpt-5"
+    }
+  },
+  "call_stat": {
+    "input_tokens": 1500,
+    "input_cached_tokens": 200,
+    "output_tokens": 800,
+    "output_reasoning_tokens": 0,
+    "total_tokens": 2300
+  },
+  "status": "completed",
+  "error": null
+}
+```
+
+**Failure Response Example:**
+
+```json
+{
+  "final_answer": "",
+  "trajectory": null,
+  "call_stat": null,
+  "status": "failed",
+  "error": "Missing required service_env_params: SERPER_API_KEY, JINA_API_KEY"
+}
+```
+
+#### Response Fields
+
+**Top-level Fields:**
+
+| Field | Type | Description |
+|------|------|------|
+| `final_answer` | string | Final answer (returns boxed_answer if available, otherwise final_answer) |
+| `trajectory` | object/null | Execution trajectory object containing complete execution history |
+| `call_stat` | object/null | Token usage statistics (main model only) |
+| `status` | string | Task status: "completed" or "failed" |
+| `error` | string/null | Error message (returned on failure) |
+
+**trajectory Object Structure:**
+
+| Field | Type | Description |
+|------|------|------|
+| `main_agent_message_history` | object | Main agent's message history |
+| `sub_agent_message_history_sessions` | object | Sub-agent message history sessions |
+| `step_logs` | array | Detailed step execution logs |
+| `tool_models` | object | Tool model configuration information |
+
+**call_stat Object Structure:**
+
+| Field | Type | Description |
+|------|------|------|
+| `input_tokens` | int | Total input tokens |
+| `input_cached_tokens` | int | Cached input tokens |
+| `output_tokens` | int | Total output tokens |
+| `output_reasoning_tokens` | int | Reasoning tokens (e.g., o1 models) |
+| `total_tokens` | int | Total tokens |
+
+### GET /health
+
+Health check endpoint.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "miroflow"
+}
+```
+
+## Configuration
+
+### Tool API Environment Variables
+
+`service_env_params` are tool API configuration parameters passed to the MiroFlow service through AgentCompass requests. These parameters are set as environment variables on the service side and used by MiroFlow's various tools (search, code execution, file reading, reasoning, etc.).
+
+> **Important Notes**:
+> - These parameters are passed by **AgentCompass** through the `service_env_params` field when calling the MiroFlow service
+> - MiroFlow service sets these parameters as environment variables for tool usage
+> - Do NOT configure these parameters in the `.env` file (`.env` is only for service-level configurations like proxy, logging, etc.)
+
+#### Required Parameters
+
+The following parameters must be provided in `service_env_params`, otherwise the service will return an error:
+
+| Parameter | Purpose | Use Case | Example |
+|------|------|----------|------|
+| `OPENROUTER_API_KEY` | OpenRouter API key | Used for reasoning tools, hint generation, final answer extraction, and other auxiliary models | `sk-or-v1-xxx` |
+| `OPENROUTER_BASE_URL` | OpenRouter API address | Used with API key | `https://openrouter.ai/api/v1` |
+| `SERPER_API_KEY` | Serper search engine API key | Used for web search tool (tool-searching) | `xxx` |
+| `JINA_API_KEY` | Jina Reader API key | Used for web content reading and parsing (tool-reading) | `jina_xxx` |
+| `E2B_API_KEY` | E2B code sandbox API key | Used for safe Python code execution (tool-python) | `e2b_xxx` |
+
+#### Required Parameters (with Defaults)
+
+The following parameters will use default values if not provided:
+
+| Parameter | Default Value | Purpose | Use Case |
+|------|--------|------|----------|
+| `OPENROUTER_MODEL_NAME` | `gpt-5` | OpenRouter default model name | Used for reasoning tools, hint generation, final answer extraction, and other auxiliary tasks |
+
+#### Optional Parameters (with Defaults)
+
+The following parameters will use default values or reference other parameters if not provided (`$ENV_VAR` indicates referencing another parameter's value):
+
+**Reasoning Tool Related (tool-reasoning):**
+
+| Parameter | Default Value | Purpose |
+|------|--------|------|
+| `ANTHROPIC_API_KEY` | `dummy-key` | Anthropic API key for calling Claude models for reasoning |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Anthropic API address |
+| `ANTHROPIC_MODEL_NAME` | `claude-3-7-sonnet-20250219` | Anthropic default model name |
+
+**Video Analysis Related (tool-image-video):**
+
+| Parameter | Default Value | Purpose |
+|------|--------|------|
+| `GEMINI_API_KEY` | `dummy-key` | Google Gemini API key for YouTube video analysis |
+
+**Vision Tool Related (tool-image-video):**
+
+| Parameter | Default Value | Purpose |
+|------|--------|------|
+| `VISION_API_KEY` | `$OPENROUTER_API_KEY` | Vision model API key for image analysis |
+| `VISION_BASE_URL` | `$OPENROUTER_BASE_URL` | Vision model API address |
+| `VISION_MODEL_NAME` | `gpt-4o` | Vision model name |
+
+**Audio Tool Related (tool-audio):**
+
+| Parameter | Default Value | Purpose |
+|------|--------|------|
+| `AUDIO_API_KEY` | `$OPENROUTER_API_KEY` | Audio model API key for audio transcription and analysis |
+| `AUDIO_BASE_URL` | `$OPENROUTER_BASE_URL` | Audio model API address |
+| `AUDIO_TRANSCRIPTION_MODEL_NAME` | `gpt-4o-mini-transcribe` | Audio transcription model name |
+| `AUDIO_MODEL_NAME` | `gpt-4o-audio-preview` | Audio analysis model name |
+
+**Hint Generation Related:**
+
+| Parameter | Default Value | Purpose |
+|------|--------|------|
+| `OPENAI_API_KEY` | `$OPENROUTER_API_KEY` | OpenAI API key for general LLM calls |
+| `OPENAI_BASE_URL` | `$OPENROUTER_BASE_URL` | OpenAI API address |
+| `HINT_LLM_API_KEY` | `$OPENROUTER_API_KEY` | Hint generation model API key for generating task hints |
+| `HINT_LLM_BASE_URL` | `$OPENROUTER_BASE_URL` | Hint generation model API address |
+| `HINT_LLM_MODEL_NAME` | `$OPENROUTER_MODEL_NAME` | Hint generation model name |
+
+**Final Answer Extraction Related:**
+
+| Parameter | Default Value | Purpose |
+|------|--------|------|
+| `FINAL_ANSWER_LLM_API_KEY` | `$OPENROUTER_API_KEY` | Final answer extraction model API key for extracting answers from execution results |
+| `FINAL_ANSWER_LLM_BASE_URL` | `$OPENROUTER_BASE_URL` | Final answer extraction model API address |
+| `FINAL_ANSWER_LLM_MODEL_NAME` | `$OPENROUTER_MODEL_NAME` | Final answer extraction model name |
+
+## Integration with AgentCompass
+
+### Integration Architecture
+
+```
+AgentCompass Gateway (8001)
+    ↓ (Task Scheduling)
+MiroFlow Service (8082)
+    ↓ (Main Model Calls)
+AgentCompass Gateway (8001)
+    ↓ (Tool Model Calls)
+Various APIs (OpenRouter, Serper, Jina, E2B, etc.)
+```
+
+### Integration Steps
+
+#### 1. Start MiroFlow Service
+
+```bash
+python miroflow_service_fastapi.py --host 0.0.0.0 --port 8082 --workers 4
+```
+
+#### 2. Call via AgentCompass
+
+Use AgentCompass batch API to call MiroFlow service:
+
+```bash
+curl -X POST "http://localhost:8001/api/tasks/batch" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "benchmark": "gaia",
+    "models": ["gpt-4o"],
+    "params": {
+      "benchmark_params": {
+        "judge_model": "gpt-4o-mini",
+        "category": "1",
+        "max_concurrency": 4,
+        "k": 1,
+        "avgk": false,
+        "service_url": "http://localhost:8082/api/tasks",
+        "service_protocol": "wait",
+        "request_timeout": 3600,
+        "service_env_params": {
+          "OPENROUTER_API_KEY": "your-key",
+          "OPENROUTER_BASE_URL": "https://openrouter.ai/api/v1",
+          "SERPER_API_KEY": "your-key",
+          "JINA_API_KEY": "your-key",
+          "E2B_API_KEY": "your-key"
+        }
+      },
+      "model_infer_params": {
+        "temperature": 0.6,
+        "top_p": 0.95
+      }
+    }
+  }'
+```
+
+**Key Parameters:**
+- `service_url`: MiroFlow service address
+- `service_protocol`: Use "wait" protocol (synchronous waiting for results)
+- `service_env_params`: Tool API configuration passed to MiroFlow
+
+## Performance Optimization
+
+### 1. Worker Configuration
+
+Adjust worker count based on server CPU cores and concurrency requirements:
+
+```bash
+# 4-core server: recommend 4-8 workers
+python miroflow_service_fastapi.py --host 0.0.0.0 --port 8082 --workers 4
+
+# 8-core server: recommend 8-16 workers
+python miroflow_service_fastapi.py --host 0.0.0.0 --port 8082 --workers 8
+```
+
+**Recommendations:**
+- Development/debugging: Use 1 worker for easier log viewing
+- Production: Use 1-2x the number of CPU cores
+
+### 2. Timeout Configuration
+
+For complex tasks, increase timeout appropriately:
+
+```json
+{
+  "llm_config": {
+    "request_timeout": 7200
+  }
+}
+```
+
+**Recommendations:**
+- Simple tasks: 1800 seconds (30 minutes)
+- Complex tasks: 3600-7200 seconds (1-2 hours)
+
+## Technical Architecture
+
+### Model Configuration
+
+**Main Model (Main Agent):**
+- Configured via `llm_config`
+- Uses `AgentCompassClient` to call AgentCompass Gateway
+- Supports `model_infer_params` (temperature, top_p, etc.)
+- Token usage statistics returned in `call_stat`
+
+**Tool Models:**
+- Configured via `service_env_params`
+- Includes: Hint generation, final answer extraction, reasoning tools, vision tools, audio tools, etc.
+- Not included in `call_stat` statistics
+
+### Execution Flow
+
+1. Receive task request (`POST /api/tasks`)
+2. Validate `llm_config` and `service_env_params`
+3. Build Hydra configuration overrides
+4. Initialize MiroFlow Pipeline
+5. Execute task (asynchronously)
+6. Extract trajectory and token statistics
+7. Return results
+
+## License
+
+Apache-2.0 License

@@ -19,10 +19,19 @@ logger = bootstrap_logger(level=LOGGER_LEVEL)
 
 # MCP server configuration generation function
 def create_mcp_server_parameters(
-    cfg: DictConfig, agent_cfg: DictConfig, logs_dir: str | None = None
+    cfg: DictConfig, agent_cfg: DictConfig, logs_dir: str | None = None, tool_env_config: dict | None = None
 ):
-    """Define and return MCP server configuration list"""
+    """Define and return MCP server configuration list
+
+    Args:
+        cfg: The Hydra configuration object.
+        agent_cfg: The agent configuration object.
+        logs_dir: The directory to save logs.
+        tool_env_config: Environment configuration for tools (API keys, etc.) to be passed to subprocesses.
+    """
     configs = []
+    # Merge tool_env_config with static env from tool config
+    env_to_pass = tool_env_config.copy() if tool_env_config else {}
 
     if agent_cfg.get("tool_config", None) is not None:
         for tool in agent_cfg["tool_config"]:
@@ -34,6 +43,8 @@ def create_mcp_server_parameters(
                     / f"{tool}.yaml"
                 )
                 tool_cfg = OmegaConf.load(config_path)
+                # Merge static env from tool config with dynamic tool_env_config
+                merged_env = {**tool_cfg.get("env", {}), **env_to_pass}
                 configs.append(
                     {
                         "name": tool_cfg.get("name", tool),
@@ -42,7 +53,7 @@ def create_mcp_server_parameters(
                             if tool_cfg["tool_command"] == "python"
                             else tool_cfg["tool_command"],
                             args=tool_cfg.get("args", []),
-                            env=tool_cfg.get("env", {}),
+                            env=merged_env,
                         ),
                     }
                 )

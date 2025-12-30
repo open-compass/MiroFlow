@@ -17,41 +17,35 @@ from .utils.smart_request import smart_request, request_to_json
 from src.logging.logger import setup_mcp_logging
 
 
-SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "")
-SERPER_BASE_URL = os.environ.get("SERPER_BASE_URL", "https://google.serper.dev")
-JINA_API_KEY = os.environ.get("JINA_API_KEY", "")
-JINA_BASE_URL = os.environ.get("JINA_BASE_URL", "https://r.jina.ai")
-
-# Proxy settings
-HTTP_PROXY = os.environ.get("http_proxy", "")
-HTTPS_PROXY = os.environ.get("https_proxy", "")
-NO_PROXY = os.environ.get("no_proxy", "")
-
 IS_MIRO_API = True
 
-# Google search result filtering environment variables
-REMOVE_SNIPPETS = os.environ.get("REMOVE_SNIPPETS", "").lower() in ("true", "1", "yes")
-REMOVE_KNOWLEDGE_GRAPH = os.environ.get("REMOVE_KNOWLEDGE_GRAPH", "").lower() in (
-    "true",
-    "1",
-    "yes",
-)
-REMOVE_ANSWER_BOX = os.environ.get("REMOVE_ANSWER_BOX", "").lower() in (
-    "true",
-    "1",
-    "yes",
-)
+
+def _get_env_config():
+    """Get environment configuration at runtime to support per-request isolation."""
+    return {
+        "SERPER_API_KEY": os.environ.get("SERPER_API_KEY", ""),
+        "SERPER_BASE_URL": os.environ.get("SERPER_BASE_URL", "https://google.serper.dev"),
+        "JINA_API_KEY": os.environ.get("JINA_API_KEY", ""),
+        "JINA_BASE_URL": os.environ.get("JINA_BASE_URL", "https://r.jina.ai"),
+        "HTTP_PROXY": os.environ.get("http_proxy", ""),
+        "HTTPS_PROXY": os.environ.get("https_proxy", ""),
+        "NO_PROXY": os.environ.get("no_proxy", ""),
+        "REMOVE_SNIPPETS": os.environ.get("REMOVE_SNIPPETS", "").lower() in ("true", "1", "yes"),
+        "REMOVE_KNOWLEDGE_GRAPH": os.environ.get("REMOVE_KNOWLEDGE_GRAPH", "").lower() in ("true", "1", "yes"),
+        "REMOVE_ANSWER_BOX": os.environ.get("REMOVE_ANSWER_BOX", "").lower() in ("true", "1", "yes"),
+    }
 
 # Initialize FastMCP server
 setup_mcp_logging(tool_name=os.path.basename(__file__))
 mcp = FastMCP("searching-mcp-server")
 
 
-def filter_google_search_result(result_content: str) -> str:
-    """Filter google search result content based on environment variables.
+def filter_google_search_result(result_content: str, env_config: dict) -> str:
+    """Filter google search result content based on environment configuration.
 
     Args:
         result_content: The JSON string result from google search
+        env_config: Environment configuration from _get_env_config()
 
     Returns:
         Filtered JSON string result
@@ -61,15 +55,15 @@ def filter_google_search_result(result_content: str) -> str:
         data = json.loads(result_content)
 
         # Remove knowledgeGraph if requested
-        if REMOVE_KNOWLEDGE_GRAPH and "knowledgeGraph" in data:
+        if env_config["REMOVE_KNOWLEDGE_GRAPH"] and "knowledgeGraph" in data:
             del data["knowledgeGraph"]
 
         # Remove answerBox if requested
-        if REMOVE_ANSWER_BOX and "answerBox" in data:
+        if env_config["REMOVE_ANSWER_BOX"] and "answerBox" in data:
             del data["answerBox"]
 
         # Remove snippets if requested
-        if REMOVE_SNIPPETS:
+        if env_config["REMOVE_SNIPPETS"]:
             # Remove snippets from organic results
             if "organic" in data:
                 for item in data["organic"]:
@@ -115,7 +109,8 @@ async def google_search(
     Returns:
         The search results.
     """
-    if SERPER_API_KEY == "":
+    env_config = _get_env_config()
+    if env_config["SERPER_API_KEY"] == "":
         return (
             "[ERROR]: SERPER_API_KEY is not set, google_search tool is not available."
         )
@@ -135,19 +130,19 @@ async def google_search(
     if IS_MIRO_API:
         # Build env dict with API keys and proxy settings
         subprocess_env = {
-            "SERPER_API_KEY": SERPER_API_KEY,
-            "SERPER_BASE_URL": SERPER_BASE_URL,
+            "SERPER_API_KEY": env_config["SERPER_API_KEY"],
+            "SERPER_BASE_URL": env_config["SERPER_BASE_URL"],
         }
         # Add proxy settings if available
-        if HTTP_PROXY:
-            subprocess_env["http_proxy"] = HTTP_PROXY
-            subprocess_env["HTTP_PROXY"] = HTTP_PROXY
-        if HTTPS_PROXY:
-            subprocess_env["https_proxy"] = HTTPS_PROXY
-            subprocess_env["HTTPS_PROXY"] = HTTPS_PROXY
-        if NO_PROXY:
-            subprocess_env["no_proxy"] = NO_PROXY
-            subprocess_env["NO_PROXY"] = NO_PROXY
+        if env_config["HTTP_PROXY"]:
+            subprocess_env["http_proxy"] = env_config["HTTP_PROXY"]
+            subprocess_env["HTTP_PROXY"] = env_config["HTTP_PROXY"]
+        if env_config["HTTPS_PROXY"]:
+            subprocess_env["https_proxy"] = env_config["HTTPS_PROXY"]
+            subprocess_env["HTTPS_PROXY"] = env_config["HTTPS_PROXY"]
+        if env_config["NO_PROXY"]:
+            subprocess_env["no_proxy"] = env_config["NO_PROXY"]
+            subprocess_env["NO_PROXY"] = env_config["NO_PROXY"]
         
         server_params = StdioServerParameters(
             command=sys.executable,
@@ -175,8 +170,8 @@ async def google_search(
                         assert (
                             result_content is not None and result_content.strip() != ""
                         ), "Empty result from google_search tool, please try again."
-                        # Apply filtering based on environment variables
-                        filtered_result = filter_google_search_result(result_content)
+                        # Apply filtering based on environment configuration
+                        filtered_result = filter_google_search_result(result_content, env_config)
                         return filtered_result  # Success, exit retry loop
             except Exception as error:
                 retry_count += 1
@@ -187,7 +182,7 @@ async def google_search(
     else:
         # Use Python requests instead of npx
         headers = {
-            'X-API-KEY': SERPER_API_KEY,
+            'X-API-KEY': env_config["SERPER_API_KEY"],
             'Content-Type': 'application/json'
         }
         
@@ -203,9 +198,9 @@ async def google_search(
                 )
                 response.raise_for_status()
                 result_content = json.dumps(response.json())
-                
-                # Apply filtering based on environment variables
-                filtered_result = filter_google_search_result(result_content)
+
+                # Apply filtering based on environment configuration
+                filtered_result = filter_google_search_result(result_content, env_config)
                 return filtered_result
             except Exception as error:
                 retry_count += 1
@@ -341,6 +336,7 @@ async def search_wiki_revision(
         str: Formatted revision history with timestamps, revision IDs, and URLs.
              Returns error message if page not found or other issues occur.
     """
+    env_config = _get_env_config()
     # Auto-adjust date values and track changes
     adjustments = []
     original_year, original_month = year, month
@@ -405,10 +401,10 @@ async def search_wiki_revision(
             url=base_url,
             params=params,
             env={
-                "SERPER_API_KEY": SERPER_API_KEY,
-                "JINA_API_KEY": JINA_API_KEY,
-                "SERPER_BASE_URL": SERPER_BASE_URL,
-                "JINA_BASE_URL": JINA_BASE_URL,
+                "SERPER_API_KEY": env_config["SERPER_API_KEY"],
+                "JINA_API_KEY": env_config["JINA_API_KEY"],
+                "SERPER_BASE_URL": env_config["SERPER_BASE_URL"],
+                "JINA_BASE_URL": env_config["JINA_BASE_URL"],
             },
         )
         data = request_to_json(content)
@@ -503,6 +499,7 @@ async def search_archived_webpage(url: str, year: int, month: int, day: int) -> 
         str: Formatted archive information including archived URL, timestamp, and status.
              Returns error message if URL not found or other issues occur.
     """
+    env_config = _get_env_config()
     # Handle empty URL
     if not url:
         return f"[ERROR]: Invalid URL: '{url}'. URL cannot be empty."
@@ -586,10 +583,10 @@ async def search_archived_webpage(url: str, year: int, month: int, day: int) -> 
                     url=base_url,
                     params={"url": url, "timestamp": date},
                     env={
-                        "SERPER_API_KEY": SERPER_API_KEY,
-                        "JINA_API_KEY": JINA_API_KEY,
-                        "SERPER_BASE_URL": SERPER_BASE_URL,
-                        "JINA_BASE_URL": JINA_BASE_URL,
+                        "SERPER_API_KEY": env_config["SERPER_API_KEY"],
+                        "JINA_API_KEY": env_config["JINA_API_KEY"],
+                        "SERPER_BASE_URL": env_config["SERPER_BASE_URL"],
+                        "JINA_BASE_URL": env_config["JINA_BASE_URL"],
                     },
                 )
                 data = request_to_json(content)
@@ -649,10 +646,10 @@ async def search_archived_webpage(url: str, year: int, month: int, day: int) -> 
                 url=base_url,
                 params={"url": url},
                 env={
-                    "SERPER_API_KEY": SERPER_API_KEY,
-                    "JINA_API_KEY": JINA_API_KEY,
-                    "SERPER_BASE_URL": SERPER_BASE_URL,
-                    "JINA_BASE_URL": JINA_BASE_URL,
+                    "SERPER_API_KEY": env_config["SERPER_API_KEY"],
+                    "JINA_API_KEY": env_config["JINA_API_KEY"],
+                    "SERPER_BASE_URL": env_config["SERPER_BASE_URL"],
+                    "JINA_BASE_URL": env_config["JINA_BASE_URL"],
                 },
             )
             data = request_to_json(content)
@@ -730,14 +727,15 @@ async def scrape_website(url: str) -> str:
     Returns:
         The scraped website content.
     """
+    env_config = _get_env_config()
     # TODO: Long Content Handling
     return await smart_request(
         url,
         env={
-            "SERPER_API_KEY": SERPER_API_KEY,
-            "JINA_API_KEY": JINA_API_KEY,
-            "SERPER_BASE_URL": SERPER_BASE_URL,
-            "JINA_BASE_URL": JINA_BASE_URL,
+            "SERPER_API_KEY": env_config["SERPER_API_KEY"],
+            "JINA_API_KEY": env_config["JINA_API_KEY"],
+            "SERPER_BASE_URL": env_config["SERPER_BASE_URL"],
+            "JINA_BASE_URL": env_config["JINA_BASE_URL"],
         },
     )
 

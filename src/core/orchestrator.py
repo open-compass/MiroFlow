@@ -87,6 +87,7 @@ class Orchestrator:
         cfg: DictConfig,
         task_log: TaskTracer,
         sub_agent_llm_client: Optional[LLMProviderClientBase] = None,
+        tool_env_config: Optional[dict] = None,
     ):
         self.main_agent_tool_manager = main_agent_tool_manager
         self.sub_agent_tool_managers = sub_agent_tool_managers
@@ -97,6 +98,7 @@ class Orchestrator:
         self.output_formatter = output_formatter
         self.cfg = cfg
         self.task_log = task_log
+        self.tool_env_config = tool_env_config or {}
         # call this once, then use cache value
         self._list_sub_agent_tools = _list_tools(sub_agent_tool_managers)
 
@@ -752,11 +754,11 @@ Your objective is maximum completeness, transparency, and detailed documentation
             try:
                 hint_content = await extract_hints(
                     task_description,
-                    os.environ.get("HINT_LLM_API_KEY", ""),
+                    self.tool_env_config.get("HINT_LLM_API_KEY", ""),
                     self.chinese_context,
                     self.add_message_id,
-                    os.environ.get("HINT_LLM_BASE_URL", "https://api.openai.com/v1"),
-                    os.environ.get("HINT_LLM_MODEL_NAME", "o3"),
+                    self.tool_env_config.get("HINT_LLM_BASE_URL", "https://api.openai.com/v1"),
+                    self.tool_env_config.get("HINT_LLM_MODEL_NAME", "o3"),
                 )
                 hint_notes = (
                     "\n\nBefore you begin, please review the following preliminary notes highlighting subtle or easily misunderstood points in the question, which might help you avoid common pitfalls during your analysis (for reference only; these may not be exhaustive):\n\n"
@@ -1026,9 +1028,9 @@ Your objective is maximum completeness, transparency, and detailed documentation
                         extracted_answer = await extract_browsecomp_zh_final_answer(
                             task_description,
                             final_answer_text,
-                            os.environ.get("FINAL_ANSWER_LLM_API_KEY", ""),
-                            os.environ.get("FINAL_ANSWER_LLM_BASE_URL", "https://api.openai.com/v1"),
-                            os.environ.get("FINAL_ANSWER_LLM_MODEL_NAME", "o3"),
+                            self.tool_env_config.get("FINAL_ANSWER_LLM_API_KEY", ""),
+                            self.tool_env_config.get("FINAL_ANSWER_LLM_BASE_URL", "https://api.openai.com/v1"),
+                            self.tool_env_config.get("FINAL_ANSWER_LLM_MODEL_NAME", "o3"),
                         )
 
                         # Disguise LLM extracted answer as assistant returned result and add to message history
@@ -1049,10 +1051,10 @@ Your objective is maximum completeness, transparency, and detailed documentation
                         extracted_answer = await extract_gaia_final_answer(
                             task_description,
                             final_answer_text,
-                            os.environ.get("FINAL_ANSWER_LLM_API_KEY", ""),
+                            self.tool_env_config.get("FINAL_ANSWER_LLM_API_KEY", ""),
                             self.chinese_context,
-                            os.environ.get("FINAL_ANSWER_LLM_BASE_URL", "https://api.openai.com/v1"),
-                            os.environ.get("FINAL_ANSWER_LLM_MODEL_NAME", "o3"),
+                            self.tool_env_config.get("FINAL_ANSWER_LLM_BASE_URL", "https://api.openai.com/v1"),
+                            self.tool_env_config.get("FINAL_ANSWER_LLM_MODEL_NAME", "o3"),
                         )
 
                         # Disguise LLM extracted answer as assistant returned result and add to message history

@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  miroflow-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: opencompass/miroflow-service:v1.0.0
+    container_name: miroflow-service
+    ports:
+      - "8082:8082"  # FastAPI service
+    environment:
+      # Logger configuration
+      - LOGGER_LEVEL=INFO
+
+      # Data directory
+      - DATA_DIR=data
+
+      # Number of Uvicorn workers
+      - WORKERS=4
+
+      # Proxy configuration (optional)
+      # Uncomment and set these if you need proxy access
+      # - HTTP_PROXY=http://your-proxy:port
+      # - HTTPS_PROXY=http://your-proxy:port
+      # - NO_PROXY=localhost,127.0.0.1
+
+      # Tool API Keys (required by MiroFlow)
+      # These should be set via environment variables or .env file
+      # - OPENROUTER_API_KEY=your_openrouter_key
+      # - OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+      # - OPENROUTER_MODEL_NAME=gpt-4o
+      # - SERPER_API_KEY=your_serper_key
+      # - JINA_API_KEY=your_jina_key
+      # - E2B_API_KEY=your_e2b_key
+
+    volumes:
+      # Optional: Mount local .env file to override environment variables
+      # - ../.env:/app/.env:ro
+
+      # Optional: Mount logs directory to persist logs
+      - ../logs:/app/logs
+
+      # Optional: Mount data directory for task files
+      - ../data:/app/data:ro
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

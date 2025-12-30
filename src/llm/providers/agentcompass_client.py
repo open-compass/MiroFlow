@@ -44,15 +44,23 @@ class AgentCompassClient(GPTOpenAIClient):
             self.model_infer_params = {}
 
     def _create_client(self, config: DictConfig):
-        """Create httpx client for AgentCompass Gateway."""
+        """Create httpx client for AgentCompass Gateway with connection pooling."""
         self.base_url = getattr(self.cfg.llm, "base_url", "")
         self.api_key = getattr(self.cfg.llm, "api_key", "")
-        timeout = getattr(self.cfg.llm, "timeout", 1800)
+        timeout = getattr(self.cfg.llm, "timeout", 3600)
 
         logger.info(f"AgentCompassClient using base_url: {self.base_url}")
         logger.info(f"AgentCompassClient using model_name: {self.model_name}")
 
-        return httpx.AsyncClient(timeout=timeout)
+        # Configure connection pooling for better performance
+        return httpx.AsyncClient(
+            timeout=timeout,
+            limits=httpx.Limits(
+                max_keepalive_connections=20,
+                max_connections=100,
+                keepalive_expiry=30.0
+            )
+        )
 
     def _build_messages(self, system_prompt: str, messages: List[Dict]) -> List[Dict]:
         """Build message list with system prompt."""
